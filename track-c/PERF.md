@@ -10,6 +10,7 @@ Rust parser, a direct-index region join and shared name IDs.
 | `run-a386410cf9fb` | `0a3e541` | Correct | 1.498349 | 41,844,736 | 4.471266 | 32.521528 |
 | `run-1aa8da2699b7` | `bc07ea2` | Correct, unchanged C source | 1.378084 | 41,967,616 | 4.659556 | 33.417225 |
 | `run-003ee484731c` | `82216f0` | Correct, unchanged C source | 1.384427 | 41,922,560 | 4.649868 | 33.372031 |
+| `run-b8ed3a89e330` | `17838c7` | Correct, dynamic country bitsets | 1.091973 | 18,083,840 | 6.147218 | 39.433931 |
 
 The [official live board](https://speeddemon.dev/board/) reported this run on
 2026-10-30, from 20:21:22 to 20:21:25 UTC. Check, build, correctness, timeout and
@@ -125,5 +126,51 @@ count; the board's normalized S may differ. No library dependency was added.
 Candidate `src/main.rs` SHA-256:
 `15dea14b9a159bf0360ae55e4fcb056892a31f2b2dbc13f7618bfcfff54be1c9`.
 
-Codex implemented and validated this change. Its official board result remains
-pending at the time of this log entry.
+Codex implemented and validated this change. The official live-board run
+`run-b8ed3a89e330` for commit `17838c7` finished at 21:03:53 UTC with all five
+gates passing: T = 1.091973 s, M = 18,083,840 bytes, S = 181, D = 1,
+K = 6.147218 and 39.433931 machine points. This exceeds the prior best
+33.417225 by 6.016706 points (calculated from the two official values).
+At 21:04:13 UTC, the board displayed overall 44.759, rank 38. D also recorded
+a better same-source rerun; the overall change cannot be attributed solely to
+C. These are live machine results, not final judging or an award.
+
+## Rejected name-hash experiment — 2026-10-30
+
+Sparse instrumentation sampled every 257th record at three offsets. The
+extrapolated text-decoding times were 0.187–0.222 s; name-interner times were
+0.350–0.384 s. These estimates include timer overhead and sampling effects, so
+they identify a candidate region rather than an exact CPU-time breakdown.
+
+An independent Rust implementation of 64-bit FNV-1a, following
+[RFC 9923](https://www.rfc-editor.org/rfc/rfc9923.html#section-2), replaced only
+the global map's hasher. The map still compared complete name bytes. All
+correctness checks passed, including a private build that returned zero for
+every hash: distinct names, empty values, quotes, BOM bytes and trailing spaces
+still remained correct. Tiny seeds 19 and 20, then reserved 21, and the offline
+full-data container also matched the expected outputs.
+
+Five interleaved full-data runs had a median of 0.69 s for both implementations.
+The accepted times were 0.66, 0.68, 0.69, 0.70 and 0.71 s; the candidate times
+were 0.67, 0.67, 0.69, 0.69 and 0.69 s. Maximum process RSS was 18,532 versus
+18,528 KiB. The additional hashing code brought no measured median improvement,
+so the candidate was rejected locally and never submitted. The accepted
+standard-library hasher was restored. This result does not establish that
+hashing is free; it rules out this replacement under the measured conditions.
+
+## Rejected field-decoder experiment — 2026-10-30
+
+A separate candidate copied unquoted fields as contiguous slices and decoded
+quoted fields one segment at a time, between quote delimiters. The standard
+name hasher and country bitsets stayed unchanged. It passed the existing
+oracles, 338 additional name/note combinations under minimal and explicit
+text quoting, tiny seeds 22 and 23 followed by reserved 24, and the offline
+full-data container. The added cases included empty values, commas, escaped
+quotes, CR/LF, BOM bytes and 4,096-byte fields.
+
+Five interleaved full runs again had a median of 0.69 s for both binaries.
+The baseline times were 0.77, 0.69, 0.68, 0.80 and 0.69 s; candidate times were
+0.72, 0.69, 0.69, 0.72 and 0.69 s. Maximum process RSS was 18,548 KiB for both.
+The timing gain did not meet the registered gate, so the change was kept out
+of the submission and the accepted decoder was restored. These two negative
+experiments leave the previously scored bitset implementation intact.

@@ -13,6 +13,7 @@ on 2026-10-30, starting at 20:12:40 UTC and ending at 20:12:41 UTC.
 | `run-6ab97c79674a` | `0a3e541` | Correct, unchanged A source | 0.671838 | 37,072,896 | 9.189495 | 48.164582 |
 | `run-9e782f477ef0` | `bc07ea2` | Correct, unchanged A source | 0.670863 | 36,962,304 | 9.201667 | 48.193324 |
 | `run-4706ea04e92c` | `82216f0` | Correct, unchanged A source | 0.679358 | 37,076,992 | 9.138291 | 48.043249 |
+| `run-c8dacaf730a8` | `17838c7` | Correct, unchanged A source | 0.676361 | 37,179,392 | 9.153464 | 48.079274 |
 
 Check, build, correctness, timeout and sandbox gates all passed. The board
 reported S = 94 and D = 1, and displayed rank 48 in Track A at 20:14:55 UTC.
@@ -79,3 +80,10 @@ integer objects. This candidate groups by the fixed UTC-hour prefix and stores
 run, so the measurements cover these changes together and do not assign the
 speedup to any one of them. The official live-board result is recorded above;
 no final score or award is claimed.
+
+## Same-source observation with the C bitset push
+
+Commit `17838c7` changed C; this track's source was unchanged. Run
+`run-c8dacaf730a8` passed all five gates and recorded 48.079274
+machine points. The board retained the prior best 48.193324.
+At 21:04:13 UTC, the overall display was 44.759, rank 38.

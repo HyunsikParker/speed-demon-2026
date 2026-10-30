@@ -9,6 +9,7 @@ query-term index.
 |---|---|---|---:|---:|---:|---:|
 | `run-750270f3b3c2` | `bc07ea2` | Correct | 5.433148 | 387,010,560 | 4.136591 | 30.832131 |
 | `run-27458ab5e1fd` | `82216f0` | Correct, unchanged B source | 5.915574 | 389,976,064 | 3.958284 | 29.875346 |
+| `run-856be110b4b8` | `17838c7` | Correct, unchanged B source | 5.571093 | 386,613,248 | 4.085897 | 30.56437 |
 
 The [official live board](https://speeddemon.dev/board/) reported this run on
 2026-10-30, from 20:37:54 to 20:38:00 UTC. Check, build, correctness, timeout and
@@ -72,3 +73,75 @@ others. The tokenizer still counts unindexed tokens, so dropping unused terms
 does not alter adjacency. No ablation was run: the measurements cover the
 language change, compact lists, selective indexing and query algorithms together.
 Codex implemented the candidate and ran the checks.
+
+## Same-source observation with the C bitset push
+
+Commit `17838c7` changed C; this track's source was unchanged. Run
+`run-856be110b4b8` passed all five gates and recorded 30.56437
+machine points. The board retained the prior best 30.832131.
+At 21:04:13 UTC, the overall display was 44.759, rank 38.
+
+## Document shards and bounded summaries — 2026-10-30
+
+A private phase-timing run of the accepted single-threaded code spent
+3.576519 s building the index and 0.662760 s on queries and output. The new
+implementation divides the input into up to six contiguous document ranges.
+Each worker builds an independent index and answers all queries for its range.
+It returns each query's count, ID sum and ten smallest matching IDs. Combining
+those summaries preserves Boolean set operations and document-local phrases;
+no full index merge or in-memory corpus copy is needed.
+
+The first prototype was correct and faster, but failed its memory gate. Three
+full-data pairs had median times of 4.19 s for the accepted code and 1.31 s for
+the prototype, with peak process RSS of 369,928 and 847,928 KiB. A private
+capacity probe found 444,833,280 bytes of posting and term-vector capacity,
+plus 496,486,540 bytes in result summaries. Although each summary had at most
+ten IDs, collecting `ids.into_iter().take(10)` reused the allocation of the
+whole answer vector. The summary therefore retained far more capacity than
+its length suggested. Copying the first ten IDs from a borrowed slice into a
+fresh vector fixed that retention. No allocator setting was changed.
+
+The corrected candidate was compared with the accepted single-threaded Rust
+binary on the same otherwise idle Intel Core i5-12500H/Ubuntu 24.04 WSL2 machine.
+Both used Rust 1.99.0 release optimization, LTO, one codegen unit and panic-abort.
+Three pairs were interleaved baseline/candidate, candidate/baseline,
+baseline/candidate. Each run read inputs, built indexes, answered queries and
+wrote the complete output. The table gives median wall time and the maximum
+process RSS among three runs, not official T or cgroup memory.peak M.
+
+| Public seed 1 | Accepted wall time | Six-worker wall time | Accepted peak RSS (KiB) | Six-worker peak RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Sample | 0.18 s | 0.06 s | 30,200 | 39,348 |
+| Full | 4.16 s | 1.21 s | 369,928 | 437,364 |
+
+Full timings were 4.16, 4.20 and 4.16 s for the accepted binary, and 1.19, 1.24
+and 1.21 s for the candidate: a 3.44× median ratio with an 18.2% RSS increase.
+Sample RSS increased 30.3%. Parallel indexes and per-worker query summaries
+still have a memory cost. A simple nonblank, noncomment source-line count grew
+from 166 to 238; the board's normalized S may differ. No dependency was added.
+
+Correctness checks passed:
+
+- Every possible byte split in a fixture with UTF-8, empty documents and
+  multi-digit IDs produced the same counts, sums and first ten IDs. A separate
+  1,000-match case checked that a returned ten-ID summary retained no more than
+  ten elements of vector capacity.
+- The host worked example, all six host edge-case methods, 64-bit sums,
+  repeated phrases, unindexed-token positions, a long document crossing several
+  ranges and an empty corpus matched the host reference and an independent
+  per-document predicate oracle. Worker settings 1, 2, 6 and 12 were checked;
+  the last is clamped to six.
+- Tiny seeds 28 and 29 passed before reserved seed 30 was generated. Each passed
+  at one, two and six workers, included every host-listed edge category, and
+  matched both independent implementations. Source bytes stayed frozen.
+- All timed sample/full outputs matched the published hashes. The offline-built
+  image also produced the full expected output as uid 65534, with a read-only
+  root, no network, six CPUs, 8 GB memory without swap and a 1 GB tmpfs. Its size
+  was 30,047,563 bytes. This was not the official scoring harness.
+
+Tested `src/main.rs` SHA-256:
+`1c09f4dd9e5928b9b182be994eff3edd281fe09bfee768a7c1f6e58f213f1696`.
+
+Codex implemented and validated this change. The official result is pending
+at this log entry; these local measurements do not establish a final score
+or an award.

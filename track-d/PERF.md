@@ -12,6 +12,7 @@ arrays and, by default, up to six independent query workers.
 | `run-44b5bb312166` | `0a3e541` | Correct, unchanged D source | 1.701160 | 222,834,688 | 7.118832 | 42.620437 |
 | `run-518ec8eea2ab` | `bc07ea2` | Correct, unchanged D source | 1.795418 | 222,773,248 | 6.929828 | 42.036124 |
 | `run-689c61dfbf24` | `82216f0` | Correct, bidirectional search | 1.005084 | 299,241,472 | 8.372574 | 46.142951 |
+| `run-e367e92f0b70` | `17838c7` | Correct, unchanged D source | 0.913775 | 298,807,296 | 8.783481 | 47.183334 |
 
 The [official live board](https://speeddemon.dev/board/) and its linked data feed
 reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
@@ -150,3 +151,11 @@ speedup to any one of them.
 The live-board score is recorded above; no final score, overall rank or award is
 claimed. Codex implemented the candidate and ran the checks. The saved outputs,
 timing observations and official board readback support the measurements here.
+
+## Same-source observation with the C bitset push
+
+Commit `17838c7` changed C; this track's source was unchanged. Run
+`run-e367e92f0b70` passed all five gates and recorded 47.183334
+machine points. This was a new best over 46.142951, but it is a same-source
+measurement, not evidence of a new D algorithm improvement.
+At 21:04:13 UTC, the overall display was 44.759, rank 38.

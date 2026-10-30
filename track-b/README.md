@@ -5,8 +5,9 @@ An exact Boolean and phrase-query engine for the
 
 ## Approach
 
-The program reads the queries first and interns their terms. It streams the
-corpus once, retaining postings only for those terms. Each posting list contains
+The program reads the queries first and interns their terms. Up to six workers
+share that read-only dictionary and process disjoint document ranges, retaining
+postings only for query terms. Each posting list contains
 sorted, unique document IDs. Terms used in a phrase also retain sorted 64-bit
 pairs of document ID and token position. Unindexed tokens still advance the
 position counter, so leaving a term out of the index cannot create adjacency.
@@ -25,10 +26,24 @@ A matching document is emitted once even if it contains several occurrences.
 This preserves repeated words and phrases across punctuation while preventing
 matches across document boundaries.
 
-Answers are already sorted. The program writes the count, a 64-bit ID sum and
-at most the first ten IDs for each query, retaining duplicate queries in order.
-It uses one thread. All indexes are built from the supplied inputs during the
-timed run; the image contains no corpus, cached answers or prebuilt index.
+Each worker owns a contiguous byte range. It aligns the beginning to the next
+complete document and finishes any document that begins before its range ends.
+Checking the byte before a boundary distinguishes an exact line start from a
+partial record. Each document is therefore assigned once, including when a
+long document crosses several ranges. Workers stream from separate file handles;
+the program does not copy the corpus into memory.
+
+Every worker evaluates all queries against its own document set. Restricting a
+set to disjoint documents commutes with union, intersection and binary difference,
+so left-to-right Boolean evaluation remains exact. Phrase matches stay inside
+one document. Workers return only counts, 64-bit ID sums and up to ten smallest
+matching IDs per query. Counts and sums add; concatenating the sorted summaries
+in document-range order and taking ten gives the global ten smallest IDs.
+Duplicate queries retain their input order.
+
+The default is six workers. `SD_WORKERS` selects a value clamped to 1–6. All
+indexes are built from the supplied inputs during the timed run; the image
+contains no corpus, cached answers or prebuilt index.
 
 ## Build and run
 
