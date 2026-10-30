@@ -142,6 +142,68 @@ Correctness checks passed:
 Tested `src/main.rs` SHA-256:
 `1c09f4dd9e5928b9b182be994eff3edd281fe09bfee768a7c1f6e58f213f1696`.
 
-Codex implemented and validated this change. The official result is pending
-at this log entry; these local measurements do not establish a final score
-or an award.
+Codex implemented and validated this change. Official live-board run
+`run-a67cb4dd29a3`, commit `57f452c`, finished at 21:35:15 UTC with all five
+gates passing. It recorded T = 1.1123 s, M = 460,935,168 bytes, S = 246,
+D = 1, K = 8.381392 and 46.165807 machine points. This exceeds the prior B
+best of 30.832131 by 15.333676 points, calculated from the two official values.
+B now contributes to the team's best three tracks with A and D.
+
+At 21:36:09 UTC, the board displayed overall 47.174 and rank 36. These are
+live machine results, not the final judged total or an award.
+
+
+## Streaming phrase matching — 2026-10-30
+
+A private diagnostic of the accepted six-worker implementation measured
+0.925–1.025 s building each shard's index and 0.160–0.174 s answering its queries.
+Across the six indexes, position-vector capacity occupied 289,859,008 bytes of
+444,833,280 bytes in posting and term metadata allocations. These are capacity
+counts, not complete process memory measurements; simultaneous per-worker times
+must not be added to obtain wall time.
+
+The new implementation builds a token-ID Aho–Corasick automaton from the actual
+phrase queries. Workers find phrase matches while reading documents, retaining
+matching document IDs instead of every term occurrence and position. Boolean
+queries keep their sorted-list operations. Phrase-only terms no longer need
+Boolean posting lists. The six document shards and bounded result summaries
+are unchanged. No external crate or ready-made search engine was added.
+
+The accepted and candidate binaries used Rust 1.99.0 with release optimization,
+LTO, one codegen unit and panic-abort on the same Intel Core i5-12500H/Ubuntu
+24.04 WSL2 machine. Three pairs were interleaved baseline/candidate,
+candidate/baseline, baseline/candidate. Each run included query parsing,
+automaton or index construction, document reading, query evaluation and output.
+
+| Public seed 1 | Accepted median wall | Candidate median wall | Accepted max RSS (KiB) | Candidate max RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Sample | 0.05 s | 0.05 s | 41,100 | 21,076 |
+| Full | 1.22 s | 1.13 s | 437,568 | 185,296 |
+
+Full timings were 1.19, 1.22 and 1.22 s for the baseline, and 1.15, 1.13 and
+1.12 s for the candidate. Median wall time fell 7.4%, and maximum process RSS
+fell 57.7%. GNU time's process RSS is not official cgroup memory.peak. A simple
+nonblank, noncomment source-line count grew from 238 to 296; the board's
+normalized S may differ. The measurements cover this implementation as a whole,
+including removal of phrase-only Boolean postings; no ablation isolates each part.
+
+Correctness checks included every byte boundary in the shard fixture, bounded
+summary capacity, the host worked example and all six host edge-case methods.
+An independent per-document predicate oracle also checked all binary token
+sequences through length eight against overlapping and suffix-related phrases,
+including repeated patterns, duplicate queries, unknown-token resets and
+separate documents. Existing 64-bit sums, long-document and empty-corpus checks
+passed at worker settings 1, 2, 6 and 12, with 12 clamped to six.
+
+Tiny seeds 31 and 32 passed before reserved seed 33 was generated, with frozen
+source and exact host/reference/oracle agreement at one, two and six workers.
+Every timed sample/full output matched its published hash. The offline-built
+30,054,392-byte image produced the exact full output as uid 65534, with a
+read-only root, no network, six CPUs, 8 GB memory without swap and a 1 GB tmpfs.
+This was not the official scoring harness.
+
+Tested `src/main.rs` SHA-256:
+`93b3c83be530f5b756710a185252290821655186148769cb209375b0086a2ea8`.
+
+Codex implemented and validated this change. Its official result is pending
+at this log entry; the local measurements do not establish a final score or award.

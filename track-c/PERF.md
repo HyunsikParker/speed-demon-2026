@@ -174,3 +174,12 @@ The baseline times were 0.77, 0.69, 0.68, 0.80 and 0.69 s; candidate times were
 The timing gain did not meet the registered gate, so the change was kept out
 of the submission and the accepted decoder was restored. These two negative
 experiments leave the previously scored bitset implementation intact.
+
+## Same-source observation with the B shard push
+
+Commit `57f452c` changed B; this track's source was unchanged. Run
+`run-8ca90f47ddae` passed all five gates and recorded 39.509831
+machine points. This is a new same-source best, up from 39.433931;
+it does not establish a new C algorithm improvement. C is now outside
+the best three tracks used for the displayed overall score.
+At 21:36:09 UTC, the overall display was 47.174, rank 36.

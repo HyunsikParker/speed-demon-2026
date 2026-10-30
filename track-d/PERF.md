@@ -159,3 +159,10 @@ Commit `17838c7` changed C; this track's source was unchanged. Run
 machine points. This was a new best over 46.142951, but it is a same-source
 measurement, not evidence of a new D algorithm improvement.
 At 21:04:13 UTC, the overall display was 44.759, rank 38.
+
+## Same-source observation with the B shard push
+
+Commit `57f452c` changed B; this track's source was unchanged. Run
+`run-9644ded2c069` passed all five gates and recorded 47.157433
+machine points. The board retained the prior best 47.183334.
+At 21:36:09 UTC, the overall display was 47.174, rank 36.

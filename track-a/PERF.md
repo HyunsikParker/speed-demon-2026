@@ -87,3 +87,10 @@ Commit `17838c7` changed C; this track's source was unchanged. Run
 `run-c8dacaf730a8` passed all five gates and recorded 48.079274
 machine points. The board retained the prior best 48.193324.
 At 21:04:13 UTC, the overall display was 44.759, rank 38.
+
+## Same-source observation with the B shard push
+
+Commit `57f452c` changed B; this track's source was unchanged. Run
+`run-332b9702f5a7` passed all five gates and recorded 48.160952
+machine points. The board retained the prior best 48.193324.
+At 21:36:09 UTC, the overall display was 47.174, rank 36.

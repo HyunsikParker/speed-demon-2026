@@ -6,14 +6,14 @@ use std::path::Path;
 #[derive(Default)]
 struct Term {
     docs: Vec<u32>,
-    positions: Vec<u64>,
-    phrase: bool,
+    needed: bool,
 }
 
 struct Query {
     terms: Vec<usize>,
     ops: Vec<u8>,
     phrase: bool,
+    pattern: usize,
 }
 
 fn combine(a: &[u32], b: &[u32], op: u8) -> Vec<u32> {
@@ -56,36 +56,85 @@ fn combine(a: &[u32], b: &[u32], op: u8) -> Vec<u32> {
 }
 
 fn answer(q: &Query, index: &[Term]) -> Vec<u32> {
-    if !q.phrase {
-        let mut result = index[q.terms[0]].docs.clone();
-        for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
-            result = combine(&result, &index[term].docs, op);
-        }
-        return result;
-    }
-    let anchor = (0..q.terms.len())
-        .min_by_key(|&i| index[q.terms[i]].positions.len())
-        .unwrap();
-    let mut result = Vec::new();
-    for &packed in &index[q.terms[anchor]].positions {
-        let doc = (packed >> 32) as u32;
-        let pos = packed as u32;
-        if result.last() == Some(&doc) || pos < anchor as u32 {
-            continue;
-        }
-        let start = pos - anchor as u32;
-        if q.terms.iter().enumerate().all(|(i, &t)| {
-            start.checked_add(i as u32).is_some_and(|p| {
-                index[t]
-                    .positions
-                    .binary_search(&((u64::from(doc) << 32) | u64::from(p)))
-                    .is_ok()
-            })
-        }) {
-            result.push(doc);
-        }
+    let mut result = index[q.terms[0]].docs.clone();
+    for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
+        result = combine(&result, &index[term].docs, op);
     }
     result
+}
+
+#[derive(Default)]
+struct Node {
+    next: Vec<(usize, usize)>,
+    fail: usize,
+    output: Vec<usize>,
+}
+
+struct Automaton {
+    nodes: Vec<Node>,
+    root: Vec<usize>,
+    patterns: usize,
+}
+
+impl Automaton {
+    fn new(queries: &mut [Query], terms: usize) -> Self {
+        let mut ac = Self {
+            nodes: vec![Node::default()],
+            root: vec![0; terms],
+            patterns: 0,
+        };
+        let mut edges = HashMap::new();
+        for q in queries.iter_mut().filter(|q| q.phrase) {
+            let mut state = 0;
+            for &term in &q.terms {
+                state = *edges.entry((state, term)).or_insert_with(|| {
+                    let child = ac.nodes.len();
+                    ac.nodes.push(Node::default());
+                    ac.nodes[state].next.push((term, child));
+                    child
+                });
+            }
+            if ac.nodes[state].output.is_empty() {
+                ac.nodes[state].output.push(ac.patterns);
+                ac.patterns += 1;
+            }
+            q.pattern = ac.nodes[state].output[0];
+        }
+        drop(edges);
+        for node in &mut ac.nodes {
+            node.next.sort_unstable();
+        }
+        let mut queue = std::collections::VecDeque::new();
+        for &(term, child) in &ac.nodes[0].next {
+            ac.root[term] = child;
+            queue.push_back(child);
+        }
+        while let Some(state) = queue.pop_front() {
+            for (term, child) in ac.nodes[state].next.clone() {
+                let fail = ac.step(ac.nodes[state].fail, term);
+                ac.nodes[child].fail = fail;
+                let output = ac.nodes[fail].output.clone();
+                ac.nodes[child].output.extend(output);
+                queue.push_back(child);
+            }
+        }
+        ac
+    }
+
+    fn step(&self, mut state: usize, term: usize) -> usize {
+        loop {
+            if state == 0 {
+                return self.root[term];
+            }
+            if let Ok(i) = self.nodes[state]
+                .next
+                .binary_search_by_key(&term, |&(t, _)| t)
+            {
+                return self.nodes[state].next[i].1;
+            }
+            state = self.nodes[state].fail;
+        }
+    }
 }
 
 type Summary = (usize, u64, Vec<u32>);
@@ -93,18 +142,20 @@ type Summary = (usize, u64, Vec<u32>);
 fn shard(
     path: &Path,
     names: &HashMap<Vec<u8>, usize>,
-    phrases: &[bool],
+    needed: &[bool],
     queries: &[Query],
+    ac: &Automaton,
     start: u64,
     end: u64,
 ) -> std::io::Result<Vec<Summary>> {
-    let mut index: Vec<Term> = phrases
+    let mut index: Vec<Term> = needed
         .iter()
-        .map(|&phrase| Term {
-            phrase,
+        .map(|&needed| Term {
+            needed,
             ..Term::default()
         })
         .collect();
+    let mut matches = vec![Vec::<u32>::new(); ac.patterns];
     let mut file = File::open(path)?;
     file.seek(SeekFrom::Start(start.saturating_sub(1)))?;
     let mut reader = BufReader::with_capacity(1 << 20, file);
@@ -131,7 +182,7 @@ fn shard(
         }
         next_doc = Some(doc.checked_add(1).unwrap());
         line[tab + 1..].make_ascii_lowercase();
-        let mut pos = 0u32;
+        let mut state = 0;
         let mut at = tab + 1;
         while at < line.len() {
             if !line[at].is_ascii_alphanumeric() {
@@ -144,21 +195,29 @@ fn shard(
             }
             if let Some(&id) = names.get(&line[start..at]) {
                 let term = &mut index[id];
-                if term.docs.last() != Some(&doc) {
+                if term.needed && term.docs.last() != Some(&doc) {
                     term.docs.push(doc);
                 }
-                if term.phrase {
-                    term.positions.push((u64::from(doc) << 32) | u64::from(pos));
+                state = ac.step(state, id);
+                for &pattern in &ac.nodes[state].output {
+                    if matches[pattern].last() != Some(&doc) {
+                        matches[pattern].push(doc);
+                    }
                 }
+            } else {
+                state = 0;
             }
-            pos = pos.checked_add(1).unwrap();
         }
         line.clear();
     }
     Ok(queries
         .iter()
         .map(|q| {
-            let ids = answer(q, &index);
+            let ids = if q.phrase {
+                matches[q.pattern].clone()
+            } else {
+                answer(q, &index)
+            };
             (
                 ids.len(),
                 ids.iter().map(|&id| u64::from(id)).sum(),
@@ -187,6 +246,7 @@ fn main() -> std::io::Result<()> {
             terms: Vec::new(),
             ops: Vec::new(),
             phrase,
+            pattern: usize::MAX,
         };
         for (i, word) in body.split(|&c| c == b' ').enumerate() {
             if !phrase && i % 2 == 1 {
@@ -197,12 +257,13 @@ fn main() -> std::io::Result<()> {
                 index.push(Term::default());
                 index.len() - 1
             });
-            index[id].phrase |= phrase;
+            index[id].needed |= !phrase;
             q.terms.push(id);
         }
         queries.push(q);
     }
-    let phrases: Vec<bool> = index.into_iter().map(|term| term.phrase).collect();
+    let needed: Vec<bool> = index.into_iter().map(|term| term.needed).collect();
+    let ac = Automaton::new(&mut queries, names.len());
     let path = data.join("docs.txt");
     let size = fs::metadata(&path)?.len();
     let workers = std::env::var("SD_WORKERS")
@@ -213,13 +274,14 @@ fn main() -> std::io::Result<()> {
     let parts = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..workers)
             .map(|i| {
-                let (path, names, phrases, queries) = (&path, &names, &phrases, &queries);
+                let (path, names, needed, queries, ac) = (&path, &names, &needed, &queries, &ac);
                 scope.spawn(move || {
                     shard(
                         path,
                         names,
-                        phrases,
+                        needed,
                         queries,
+                        ac,
                         size * i / workers,
                         size * (i + 1) / workers,
                     )

@@ -6,11 +6,9 @@ An exact Boolean and phrase-query engine for the
 ## Approach
 
 The program reads the queries first and interns their terms. Up to six workers
-share that read-only dictionary and process disjoint document ranges, retaining
-postings only for query terms. Each posting list contains
-sorted, unique document IDs. Terms used in a phrase also retain sorted 64-bit
-pairs of document ID and token position. Unindexed tokens still advance the
-position counter, so leaving a term out of the index cannot create adjacency.
+share that read-only dictionary and process disjoint document ranges. Boolean
+query terms retain sorted, unique document-ID lists. Phrase queries become a
+shared token-pattern automaton; no positional posting lists are stored.
 
 Tokenization lowercases ASCII bytes and splits on every byte outside `a`–`z`
 and `0`–`9`. It performs no Unicode normalization or case folding. Numeric tokens
@@ -20,11 +18,15 @@ Boolean operations merge sorted lists in the order written. `NOT` is a binary
 set difference; `AND` has no precedence over `OR`. An intersection with a large
 list-size imbalance binary-searches the larger list for each smaller-list ID.
 
-For a phrase, the shortest positional list supplies anchor occurrences. The
-program checks each other term at its exact offset within the same document.
-A matching document is emitted once even if it contains several occurrences.
-This preserves repeated words and phrases across punctuation while preventing
-matches across document boundaries.
+Phrase matching uses an independently implemented Aho–Corasick automaton over
+token IDs. It is built from the supplied queries during the timed run. Failure
+links retain suffix matches, and output lists report all overlapping patterns.
+Identical phrase queries share one pattern ID but keep separate output lines.
+Each worker resets the automaton at every document boundary. A token absent from
+the query dictionary also resets it, so omitted terms cannot create adjacency.
+Repeated matches of one phrase in a document contribute only one document ID.
+The [algorithm's all-overlap semantics](https://docs.rs/aho-corasick/latest/aho_corasick/)
+are relevant here; this implementation does not use that crate or its code.
 
 Each worker owns a contiguous byte range. It aligns the beginning to the next
 complete document and finishes any document that begins before its range ends.
@@ -65,4 +67,4 @@ the measurements and their limits.
 Measure indexing and query time separately before replacing the posting layout.
 Frequent terms may benefit from bitmaps, but sparse queries would pay for scans
 of empty words. Compare that tradeoff with the sorted-list version while keeping
-phrase positions and left-to-right Boolean semantics unchanged.
+all-overlap phrase matching and left-to-right Boolean semantics unchanged.
