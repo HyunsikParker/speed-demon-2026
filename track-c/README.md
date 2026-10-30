@@ -1,15 +1,46 @@
 # Track C: Join
 
-The task, the input files and the exact output format are in the [spec](https://github.com/hackathon-raptors/speed-demon-2026/blob/main/specs/c-join.md).
+An exact CSV parser, region join and country aggregator for the
+[Track C specification](https://github.com/hackathon-raptors/speed-demon-2026/blob/main/specs/c-join.md).
 
 ## Approach
 
-How your solution works, in plain prose.
+The reader appends physical lines to a reusable record buffer until quote parity
+is even. Escaped quote pairs contribute two quotes, so they do not change that
+parity. A newline inside a quoted field stays in the record. The parser removes
+one BOM only at a record boundary, then unescapes name bytes and counts decoded
+note bytes. It preserves empty values, trailing spaces, embedded newlines and
+literal BOM bytes inside text. Notes are counted without storing their contents.
+
+The region table maps integer IDs directly to compact country IDs. Missing IDs,
+including holes within the table's range, map to `_UNMATCHED`. Names are interned
+globally as exact byte strings; each country keeps a set of those integer IDs.
+This avoids storing another copy of a name for every country where it occurs.
+No input-derived table is shipped: these structures are built from the input on
+each run.
+
+Counts and ID totals use 64-bit integers. Money is parsed and aggregated as
+signed 64-bit cents, including values between -1.00 and 0.00. Output contains only
+countries with records, sorted by their byte keys, with exact two-digit money
+formatting. The implementation uses one thread.
+
+## Build and run
+
+The Dockerfile builds offline with digest-pinned images from the official
+allowlist. It reads `/data/records.csv` and `/data/regions.csv`, then writes only
+`/out/aggregates.txt`. For a native run, use `cargo build --release --offline`,
+then `target/release/join DATA_DIRECTORY OUTPUT_DIRECTORY`. The output directory
+must already exist. The starter Python files are unchanged reference material;
+the container runs the Rust binary.
 
 ## Dependencies
 
-None.
+Rust standard library only; no CSV crate, dataframe or SQL engine.
+Codex developed the implementation and validation. [PERF.md](PERF.md) records
+the measurements and their limits.
 
 ## With another 24 hours
 
-What you would do next.
+Profile the global name interner and per-country ID sets before changing their
+layout. A bitset could reduce lookup cost for common names but reserve more
+memory for sparse countries; measure that tradeoff on a separate candidate.

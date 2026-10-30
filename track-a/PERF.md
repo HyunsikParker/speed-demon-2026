@@ -4,8 +4,17 @@
 
 The first candidate replaces Python timestamp parsing and object-heavy groups
 with a single-threaded Rust byte parser and compact integer latency vectors.
-No participant Track A board run has been recorded yet. Its run ID and official
-measurements will be added after the board returns them.
+The [official live board](https://speeddemon.dev/board/) recorded the first run
+on 2026-10-30, starting at 20:12:40 UTC and ending at 20:12:41 UTC.
+
+| Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
+|---|---|---|---:|---:|---:|---:|
+| `run-713a55a5de05` | `8a1a566` | Correct | 0.671122 | 37,187,584 | 9.188717 | 48.162744 |
+
+Check, build, correctness, timeout and sandbox gates all passed. The board
+reported S = 94 and D = 1, and displayed rank 48 in Track A at 20:14:55 UTC.
+These are live-board observations, not final five-run measurements. With only
+A and D scored at that time, the team did not yet have an overall score.
 
 ## Local validation — 2026-10-30
 
@@ -48,4 +57,5 @@ The reference parses a full timestamp for every request and stores Python
 integer objects. This candidate groups by the fixed UTC-hour prefix and stores
 32-bit latency values. It still sorts every group's latencies. No ablation was
 run, so the measurements cover these changes together and do not assign the
-speedup to any one of them. No official score, rank or award is claimed here.
+speedup to any one of them. The official live-board result is recorded above;
+no final score or award is claimed.

@@ -8,14 +8,22 @@ arrays and, by default, up to six independent query workers.
 | Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
 |---|---|---|---:|---:|---:|---:|
 | `run-d2234e76683a` | `06d5a2c` | Correct | 1.689332 | 222,765,056 | 7.144156 | 42.697548 |
+| `run-f0f2ac9f797d` | `8a1a566` | Correct, unchanged D source | 1.725366 | 222,875,648 | 7.068459 | 42.466237 |
 
 The [official live board](https://speeddemon.dev/board/) and its linked data feed
 reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
 and ended at 15:30:20. Build, correctness, timeout and sandbox gates all passed.
 The board reported S = 155 and D = 1; its displayed points round to 42.698.
 
+The second run accompanied the first Track A implementation push and changed
+only this log in Track D. It ran from 20:12:42 to 20:12:44 UTC; all five gates
+passed and S = 155, D = 1 were unchanged. The linked feed reported the new
+measurement, while the page still displayed 42.698 at 20:14:55 UTC. The slower
+second timing is an observation of the same source, not a code regression test.
+
 These are live-board observations, not the final five-run measurements or judged
-track total. Tracks A–C were still unchanged, so the team had no overall score.
+track total. Only A and D were scored after the second push, so the team still
+had no overall score.
 
 ## Local validation — 2026-10-30
 
