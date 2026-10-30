@@ -12,6 +12,7 @@ on 2026-10-30, starting at 20:12:40 UTC and ending at 20:12:41 UTC.
 | `run-713a55a5de05` | `8a1a566` | Correct | 0.671122 | 37,187,584 | 9.188717 | 48.162744 |
 | `run-6ab97c79674a` | `0a3e541` | Correct, unchanged A source | 0.671838 | 37,072,896 | 9.189495 | 48.164582 |
 | `run-9e782f477ef0` | `bc07ea2` | Correct, unchanged A source | 0.670863 | 36,962,304 | 9.201667 | 48.193324 |
+| `run-4706ea04e92c` | `82216f0` | Correct, unchanged A source | 0.679358 | 37,076,992 | 9.138291 | 48.043249 |
 
 Check, build, correctness, timeout and sandbox gates all passed. The board
 reported S = 94 and D = 1, and displayed rank 48 in Track A at 20:14:55 UTC.
@@ -28,6 +29,12 @@ The next run accompanied the first Track B implementation push, with unchanged
 A source. It ran from 20:37:52 to 20:37:53 UTC; all five gates passed
 and S = 94, D = 1 were unchanged. At 20:39:16 UTC, the team's overall display was
 40.969, rank 40. This same-source measurement is not an algorithmic improvement.
+
+The next run accompanied D's bidirectional-search update with unchanged A
+source. All five gates passed; S = 94 and D = 1 were unchanged. Its latest
+48.043249 points were below the prior best 48.193324, which the page
+retained. At 20:51:13 UTC the overall display was 42.042, rank 38. This is a
+same-source control, not an algorithmic regression or improvement claim.
 
 ## Local validation — 2026-10-30
 

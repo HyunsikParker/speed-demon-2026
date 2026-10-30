@@ -14,8 +14,11 @@ literal BOM bytes inside text. Notes are counted without storing their contents.
 
 The region table maps integer IDs directly to compact country IDs. Missing IDs,
 including holes within the table's range, map to `_UNMATCHED`. Names are interned
-globally as exact byte strings; each country keeps a set of those integer IDs.
-This avoids storing another copy of a name for every country where it occurs.
+globally as exact byte strings. Each country keeps a dynamically growing bitset
+of those IDs and a distinct-name counter. A name first seen in that country
+sets one bit and increments the counter; repeats leave it unchanged. This
+avoids a second hash lookup and another copy of the name. The bitset grows from
+the IDs actually observed; it does not assume a fixed name-pool size.
 No input-derived table is shipped: these structures are built from the input on
 each run.
 
@@ -41,6 +44,7 @@ the measurements and their limits.
 
 ## With another 24 hours
 
-Profile the global name interner and per-country ID sets before changing their
-layout. A bitset could reduce lookup cost for common names but reserve more
-memory for sparse countries; measure that tradeoff on a separate candidate.
+Profile CSV decoding and the global name interner separately. The country
+bitsets reserve space up to their highest observed global name ID, even when
+a country contains few distinct names. A sparse representation is worth
+comparing on inputs with many global names and sparse country membership.

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::path::Path;
@@ -10,7 +10,8 @@ struct Group {
     sum: i64,
     min: i64,
     max: i64,
-    names: HashSet<u32>,
+    names: Vec<u64>,
+    distinct: u64,
     name_bytes: u64,
     note_bytes: u64,
 }
@@ -134,7 +135,15 @@ fn main() -> std::io::Result<()> {
             g.sum += cents;
             g.min = g.min.min(cents);
             g.max = g.max.max(cents);
-            g.names.insert(name_id);
+            let word = name_id as usize / 64;
+            let bit = 1u64 << (name_id % 64);
+            if word >= g.names.len() {
+                g.names.resize(word + 1, 0);
+            }
+            if g.names[word] & bit == 0 {
+                g.names[word] |= bit;
+                g.distinct += 1;
+            }
             g.name_bytes += nb;
             g.note_bytes += tb;
         }
@@ -161,7 +170,7 @@ fn main() -> std::io::Result<()> {
             money(g.sum),
             money(g.min),
             money(g.max),
-            g.names.len(),
+            g.distinct,
             g.name_bytes,
             g.note_bytes
         )?;

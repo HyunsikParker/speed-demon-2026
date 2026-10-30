@@ -8,6 +8,7 @@ query-term index.
 | Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
 |---|---|---|---:|---:|---:|---:|
 | `run-750270f3b3c2` | `bc07ea2` | Correct | 5.433148 | 387,010,560 | 4.136591 | 30.832131 |
+| `run-27458ab5e1fd` | `82216f0` | Correct, unchanged B source | 5.915574 | 389,976,064 | 3.958284 | 29.875346 |
 
 The [official live board](https://speeddemon.dev/board/) reported this run on
 2026-10-30, from 20:37:54 to 20:38:00 UTC. Check, build, correctness, timeout and
@@ -15,6 +16,12 @@ sandbox gates passed. The board reported S = 174 and D = 1. At 20:39:16 UTC,
 all four tracks had valid scores; the overall display was 40.969, rank 40.
 B was below C, so it was not included in the best-three geometric mean.
 These are live machine points, not final judging or an award.
+
+The next run accompanied D's bidirectional-search update with unchanged B
+source. All five gates passed; S = 174 and D = 1 were unchanged. Its latest
+29.875346 points were below the prior best 30.832131, which the page
+retained. At 20:51:13 UTC the overall display was 42.042, rank 38. This is a
+same-source control, not an algorithmic regression or improvement claim.
 
 ## Local validation — 2026-10-30
 

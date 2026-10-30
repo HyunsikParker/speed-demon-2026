@@ -11,6 +11,7 @@ arrays and, by default, up to six independent query workers.
 | `run-f0f2ac9f797d` | `8a1a566` | Correct, unchanged D source | 1.725366 | 222,875,648 | 7.068459 | 42.466237 |
 | `run-44b5bb312166` | `0a3e541` | Correct, unchanged D source | 1.701160 | 222,834,688 | 7.118832 | 42.620437 |
 | `run-518ec8eea2ab` | `bc07ea2` | Correct, unchanged D source | 1.795418 | 222,773,248 | 6.929828 | 42.036124 |
+| `run-689c61dfbf24` | `82216f0` | Correct, bidirectional search | 1.005084 | 299,241,472 | 8.372574 | 46.142951 |
 
 The [official live board](https://speeddemon.dev/board/) and its linked data feed
 reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
@@ -65,8 +66,8 @@ these measurements.
 Full wall times were 2.33, 2.28 and 2.33 s for the baseline, and 1.11, 1.11 and
 1.12 s for the candidate. The median speedup was about 2.10×, with roughly 33.5%
 more peak process RSS. Sample times were equal at GNU `time`'s printed precision.
-These process measurements do not establish official T, cgroup M or K; no
-live-board result for this second candidate has been observed yet.
+These process measurements do not establish official T, cgroup M or K. The
+subsequent live-board result is recorded below; it is not the final five-run score.
 
 Correctness checks for the second candidate passed:
 
@@ -85,6 +86,21 @@ Correctness checks for the second candidate passed:
 Tested second-candidate `src/main.rs` SHA-256:
 `78a1c00a192e68253f6310fd9343b50d2650d793962db06d6af4790028152fc2`.
 Codex implemented this candidate and performed the comparisons.
+
+## Bidirectional candidate — official observation
+
+The new D run, `run-689c61dfbf24`, ran from 20:50:53 to 20:50:55 UTC on
+2026-10-30. Check, build, correctness, timeout and sandbox gates passed. The board
+measured S = 205 and D = 1, T = 1.005084 s, M = 299,241,472 bytes and K = 8.372574.
+Its 46.142951 machine points exceeded the prior best 42.697548 by 3.445403 points
+(calculated from the two feed values, not a separate displayed field).
+
+At 20:51:13 UTC, the team displayed 42.042 overall, rank 38, using the best three
+track scores. A, B and C were same-source controls, and all three latest runs
+were below their earlier bests. The local 2.10× time ratio did not carry over
+unchanged: D's prior-best and new official times were 1.689332 and 1.005084 s.
+The observed improvement includes higher memory use and source-size cost in K.
+It is one live-board observation, not final judging or an award.
 
 ## Local validation — 2026-10-30
 
