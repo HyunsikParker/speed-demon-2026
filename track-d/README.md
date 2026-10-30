@@ -19,9 +19,13 @@ platform index type only when accessing an edge slice. This does not narrow
 path distances or change which edges belong to each node.
 
 Each query alternates between a forward Dijkstra search from the source and a
-reverse search from the target. A vertex reached by both searches supplies an
-upper bound from a real directed path. The search stops only when the sum of
-the two minimum pending distances cannot improve that bound, not at the first
+reverse search from the target. When a vertex is popped, its distance and the
+opposite search's known distance supply an upper bound from a real directed
+path. Neighbor relaxations do not perform a second meeting check. If the settled
+frontiers meet across an edge, the first endpoint's expansion supplies an
+opposite distance that the second endpoint checks when popped. The search stops
+only when the sum of the two minimum pending distances cannot improve that
+bound, not at the first
 meeting. Stale heap entries are removed before testing this stopping condition.
 
 Each direction uses a 65-bucket minimum radix heap. Buckets group 64-bit distances

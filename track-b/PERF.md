@@ -249,3 +249,11 @@ Commit `e0378c5` changed D; this track's source was unchanged. Run
 machine points. The board retained the earlier best 49.643708.
 At 22:50:46 UTC on 2026-10-30, the overall display was 51.884, rank 35.
 This rerun does not establish a new algorithm improvement, final judging or an award.
+
+## Same-source observation with the D CSR-index push
+
+Commit `2f5cdaf` changed D; this track's source was unchanged. Run
+`run-703772e9645b` passed all five gates and recorded 49.127098
+machine points. The board retained the earlier best 49.643708.
+At 23:07:03 UTC on 2026-10-30, the overall display was 52.170, rank 34.
+This rerun does not establish a new algorithm improvement, final judging or an award.

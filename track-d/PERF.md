@@ -344,3 +344,141 @@ The full median fell about 6.1%, for a 1.0652x speedup, and peak RSS fell about
 source-size measure. The rough K-ratio proxy was 1.052174. The fixed local gate
 required speedup at least 1.05, peak RSS at most 95% of baseline and proxy at
 least 1.03. It passed. The local proxy is not an official score.
+
+## 32-bit CSR indexes — official observation
+
+Commit `2f5cdaf` ran as `run-742c0a57da2c` from 23:06:09 to 23:06:11 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.762079 s, M = 197,136,384 bytes, S = 293, D = 1,
+K = 9.907045 and 49.797206 machine points. D improved by 0.815175 points
+from 48.982031 and passed the predeclared 49.6-point threshold.
+
+Against the prior best run, official runtime fell about 3.5%
+(0.790007 to 0.762079 s) and peak memory fell about 9.5%
+(217,931,776 to 197,136,384 bytes). S increased from 292 to 293.
+The local median time had fallen about 6.1%; local timings and the proxy remain
+separate from the official measurements.
+
+At 23:07:03 UTC, the board displayed 52.170 overall, rank 34. A, B and C
+had unchanged source and lower measurements in this dispatch; their earlier
+bests remained on the board. These are live machine results, not final judging,
+an award or payment.
+
+## Rejected local candidates: parallel build and grammar parser
+
+Two later candidates were tested independently against the accepted CSR32
+version. The first built forward and reverse CSR arrays concurrently over
+immutable triples. The second consumed the exact single SP/LF delimiter after
+each number, using the specification's required trailing newline. It retained
+64-bit accumulation; inputs outside that grammar were not claimed supported.
+The two changes were not combined.
+
+Both passed the host examples, independent adjacency/distance/queue checks,
+109 adversarial/random all-pairs graphs, published output hashes and offline
+Docker execution. The parallel candidate used tiny seeds 25, 26 and reserved
+27; the parser used 28, 29 and reserved 30. Source was frozen before each
+reserved seed was generated. The parser also matched the standard decimal
+parser across widths, zero, maximum 32/64-bit values, SP/LF boundaries and EOF.
+
+Each candidate had its own five-pair interleaved full-input batch with six
+workers. The baseline source was the same, but the batches were separate.
+
+| Candidate | Baseline median | Candidate median | Baseline peak RSS | Candidate peak RSS | Speedup | Rough K proxy |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Parallel CSR build | 0.89 s | 0.86 s | 192,164 KiB | 185,508 KiB | 1.034884x | 1.023952 |
+| Single-delimiter parser | 0.91 s | 0.88 s | 192,416 KiB | 192,448 KiB | 1.034091x | 1.016869 |
+
+The parallel candidate missed its fixed speedup threshold of 1.07 and proxy
+threshold of 1.025. The parser missed its thresholds of 1.04 and 1.02. Both
+met their memory limits and produced correct outputs, but neither passed its
+full local acceptance gate. No official push was made for either candidate.
+The accepted CSR32 source was restored, and the rejected variants were kept
+privately with their measurements. These local failures do not change the
+recorded official best of 49.797206.
+
+## Queue operation counts and rejected local candidates
+
+A private instrumented copy of the accepted CSR32 source counted operations
+across all six workers and both search directions. On the full input it recorded
+7,158,380 expanded nodes, 21,074,642 examined edges, 8,693,796 relaxations and
+451,627 stale queue items. The heap made 22,382,370 peek calls, including calls
+from pop, and redistributed 32,688,342 entries in 1,822,219 batches. Counter
+identities passed, repeated sample totals matched, and every answer hash matched
+the published value. One full baseline/instrumented pair took 0.915/0.924 s,
+about 1.0% longer with counters. This single pair describes instrumentation
+overhead; operation counts do not measure where execution time is spent.
+
+Two candidates were then tested separately against the unchanged CSR32 source.
+Ready-minimum reuse cached each direction's minimum and consumed its prepared
+queue item. Packed queue entries stored common keys and node IDs in one u64,
+with a checked index into exact wide-key records when needed. Neither change
+was combined with the other or with the earlier rejected candidates.
+
+Both passed seven host examples at one, two, six and twelve workers, independent
+queue/distance/CSR properties, published hashes and offline Docker execution.
+Ready-minimum reuse matched Bellman-Ford on 111 adversarial/random graphs and
+tiny seeds 31, 32 and reserved 33. Packed entries passed 110 graphs and seeds
+34, 35 and reserved 36, plus a multiset test covering key/node limits, duplicate
+keys and resets. Each source was frozen before its reserved seed was generated.
+
+Each candidate used a separate five-pair interleaved full-input batch with six
+workers and 0.01-second timing resolution.
+
+| Candidate | Baseline median | Candidate median | Baseline peak RSS | Candidate peak RSS | Speedup | Rough K proxy |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Ready-minimum reuse | 0.90 s | 0.90 s | 191,800 KiB | 192,668 KiB | 1.000000x | 0.994957 |
+| Packed queue entries | 0.93 s | 0.97 s | 192,540 KiB | 191,300 KiB | 0.958763x | 0.970507 |
+
+Ready-minimum reuse missed its fixed speedup threshold of 1.05 and proxy
+threshold of 1.02. Packed entries missed its thresholds of 1.05 and 1.025,
+and its memory reduction of about 0.6% fell short of the required 3%. Both
+candidates were rejected locally and retained privately with their measurements.
+Neither was pushed to the official board. The accepted source was restored;
+its recorded official best remains 49.797206. A time profile is needed before
+using these counts to justify another optimization.
+
+## CPU samples and popped-vertex meeting checks
+
+Two private software profiles of the accepted CSR32 source collected 671 and
+673 user-space CPU samples at 199 Hz. The binary used the same optimized build
+flags plus debug information. The installed profiler could record addresses
+but could not resolve ELF symbols or unwind DWARF stacks. Offline resolution
+used the exact binary's executable-segment mapping and debug information;
+the original recordings were reused without another workload run.
+
+Distance lookup accounted for 323/671 and 373/673 exclusive sample locations
+(48.1% and 55.4%). Search expansion accounted for 231/671 and 194/673
+(34.4% and 28.8%), concentrated around adjacency access. One and two samples
+remained outside the resolved application. These are CPU sample shares, not
+wall-time phase shares or direct cache-miss measurements. Recorded elapsed
+times were 0.952 and 0.897 s against one unprofiled control at 0.918 s; that
+small set does not establish a stable profiling-overhead estimate. Outputs
+matched the published hashes throughout.
+
+The candidate removes the opposite-distance lookup and meeting-bound update
+from each successful neighbor relaxation. It retains the check at every popped
+vertex, valid-minimum expansion in alternating directions, and the existing
+sum-of-minima stopping condition. Queues, distance storage and graph construction
+are unchanged.
+
+Six property tests passed, including all 19,683 three-vertex directed graphs
+whose edges are absent, zero-weight or unit-weight, with all nine source/target
+pairs checked against Bellman-Ford. This includes self-loops. Seven host examples
+passed at one, two, six and twelve workers. Another 113 adversarial/random graphs
+used repeated and reversed all-pairs queries. Tiny seeds 37, 38 and reserved 39
+matched the reference and independent oracle at all four worker counts; source
+was frozen before seed 39 was generated. Published sample/full hashes and the
+offline, read-only, unprivileged Docker run also passed.
+
+Five interleaved full-input pairs with six workers gave a baseline median of
+0.93 s and candidate median of 0.84 s: a 1.107143x speedup, or about 9.7% less
+elapsed time. Peak RSS was 192,532 versus 192,320 KiB. Timing resolution was
+0.01 seconds. The rough K-ratio proxy was 1.052440; simple nonblank source lines
+fell from 285 to 281, a different measure from the official source-size metric.
+The fixed gate required speedup at least 1.07, RSS at most 1.03x baseline and
+proxy at least 1.035. All three passed. These are local measurements; official
+results must be recorded separately after submission.
+
+The sample-input medians were 0.04 s for the baseline and 0.05 s for the
+candidate. This small-input regression is one timing-resolution step; the
+predeclared efficiency gate used the full input, where the gain above was measured.

@@ -204,10 +204,6 @@ impl Search {
                 }
                 self.dist.set(v, next);
                 self.heap.push((next, v));
-                let opposite = other.dist.get(v);
-                if opposite != u64::MAX {
-                    *best = (*best).min(next + opposite);
-                }
             }
         }
     }
