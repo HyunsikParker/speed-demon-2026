@@ -3,9 +3,18 @@
 ## Live-board history
 
 The first candidate replaces the Python CSV/object pipeline with a single-threaded
-Rust parser, a direct-index region join and shared name IDs. No participant
-Track C board measurement has been recorded yet. The run ID and measurements
-will be added after the board returns them.
+Rust parser, a direct-index region join and shared name IDs.
+
+| Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
+|---|---|---|---:|---:|---:|---:|
+| `run-a386410cf9fb` | `0a3e541` | Correct | 1.498349 | 41,844,736 | 4.471266 | 32.521528 |
+
+The [official live board](https://speeddemon.dev/board/) reported this run on
+2026-10-30, from 20:21:22 to 20:21:25 UTC. Check, build, correctness, timeout and
+sandbox gates passed. The board reported S = 172 and D = 1. At 20:22:29 UTC, the
+team's three scored tracks yielded an overall 40.591, rank 40. B was still
+unscored. The overall board uses the geometric mean of the best three tracks;
+these are live machine points, not final judging or an award.
 
 ## Local validation — 2026-10-30
 
@@ -54,5 +63,6 @@ with regular expressions, and stores names separately in each country's set.
 This candidate scans buffered bytes, counts notes without retaining them, and
 stores one copy of each observed name plus integer IDs in country sets. It also
 replaces per-record region hash lookup with a direct index. No ablation was run;
-the measurements cover these changes together. No official score, rank or award
-is claimed here. Codex implemented the candidate and ran the checks.
+the measurements cover these changes together. The official live-board result
+is recorded above; no final score or award is claimed. Codex implemented the
+candidate and ran the checks.

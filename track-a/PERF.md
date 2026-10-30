@@ -10,11 +10,18 @@ on 2026-10-30, starting at 20:12:40 UTC and ending at 20:12:41 UTC.
 | Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
 |---|---|---|---:|---:|---:|---:|
 | `run-713a55a5de05` | `8a1a566` | Correct | 0.671122 | 37,187,584 | 9.188717 | 48.162744 |
+| `run-6ab97c79674a` | `0a3e541` | Correct, unchanged A source | 0.671838 | 37,072,896 | 9.189495 | 48.164582 |
 
 Check, build, correctness, timeout and sandbox gates all passed. The board
 reported S = 94 and D = 1, and displayed rank 48 in Track A at 20:14:55 UTC.
 These are live-board observations, not final five-run measurements. With only
 A and D scored at that time, the team did not yet have an overall score.
+
+The second run accompanied the first Track C implementation push. A's source
+was unchanged; all five gates passed, with S = 94 and D = 1 again. It ran from
+20:21:21 to 20:21:22 UTC. At 20:22:29 UTC the team had three scored tracks and
+an overall 40.591, rank 40. The small A measurement change is a same-source
+observation, not an optimization claim.
 
 ## Local validation — 2026-10-30
 

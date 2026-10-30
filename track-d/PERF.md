@@ -9,6 +9,7 @@ arrays and, by default, up to six independent query workers.
 |---|---|---|---:|---:|---:|---:|
 | `run-d2234e76683a` | `06d5a2c` | Correct | 1.689332 | 222,765,056 | 7.144156 | 42.697548 |
 | `run-f0f2ac9f797d` | `8a1a566` | Correct, unchanged D source | 1.725366 | 222,875,648 | 7.068459 | 42.466237 |
+| `run-44b5bb312166` | `0a3e541` | Correct, unchanged D source | 1.701160 | 222,834,688 | 7.118832 | 42.620437 |
 
 The [official live board](https://speeddemon.dev/board/) and its linked data feed
 reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
@@ -24,6 +25,12 @@ second timing is an observation of the same source, not a code regression test.
 These are live-board observations, not the final five-run measurements or judged
 track total. Only A and D were scored after the second push, so the team still
 had no overall score.
+
+The third run accompanied the first Track C implementation push, again with
+unchanged D source. It ran from 20:21:25 to 20:21:27 UTC; all five gates passed
+and S = 155, D = 1 were unchanged. The board retained the first run's 42.697548
+as D's best history. With A, C and D scored, the team displayed an overall
+40.591, rank 40, at 20:22:29 UTC.
 
 ## Local validation — 2026-10-30
 
