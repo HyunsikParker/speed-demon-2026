@@ -2,10 +2,20 @@
 
 ## Live-board history
 
-No participant board run has been recorded yet. The first candidate is a Rust
-CSR implementation with epoch-tagged distance arrays and, by default, up to six independent
-query workers. Its run ID and official measurements will be added after the board
-returns them. Local measurements below are not substitutes for those fields.
+The first candidate is a Rust CSR implementation with epoch-tagged distance
+arrays and, by default, up to six independent query workers.
+
+| Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
+|---|---|---|---:|---:|---:|---:|
+| `run-d2234e76683a` | `06d5a2c` | Correct | 1.689332 | 222,765,056 | 7.144156 | 42.697548 |
+
+The [official live board](https://speeddemon.dev/board/) and its linked data feed
+reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
+and ended at 15:30:20. Build, correctness, timeout and sandbox gates all passed.
+The board reported S = 155 and D = 1; its displayed points round to 42.698.
+
+These are live-board observations, not the final five-run measurements or judged
+track total. Tracks A–C were still unchanged, so the team had no overall score.
 
 ## Local validation — 2026-10-30
 
@@ -52,6 +62,6 @@ main component for that unreachable query type. No separate ablation was run,
 so the timing above measures these changes together and cannot attribute the
 speedup to any one of them.
 
-There is no official score, rank or award claim in this log. Codex implemented
-the candidate and ran the checks; the recorded output and timing observations
-are the basis for the claims above.
+The live-board score is recorded above; no final score, overall rank or award is
+claimed. Codex implemented the candidate and ran the checks. The saved outputs,
+timing observations and official board readback support the measurements here.
