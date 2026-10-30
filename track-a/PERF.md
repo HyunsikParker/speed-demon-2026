@@ -227,3 +227,11 @@ At 22:38:49 UTC, the board displayed 51.765 overall, rank 35. B, C and D had
 unchanged source and lower measurements in the same dispatch; their earlier
 best scores remained on the board. These are live machine results, not final
 judging, an award or payment.
+
+## Same-source observation with the D compact-storage push
+
+Commit `e0378c5` changed D; this track's source was unchanged. Run
+`run-541aadbd6ef0` passed all five gates and recorded 54.641618
+machine points. The board retained the earlier best 57.437518.
+At 22:50:46 UTC on 2026-10-30, the overall display was 51.884, rank 35.
+This rerun does not establish a new algorithm improvement, final judging or an award.

@@ -241,3 +241,11 @@ Commit `86a95c8` changed A; this track's source was unchanged. Run
 machine points. The board retained the earlier best 49.643708.
 At 22:38:49 UTC on 2026-10-30, the overall display was 51.765, rank 35.
 This rerun is not evidence of a new algorithm, final judging or an award.
+
+## Same-source observation with the D compact-storage push
+
+Commit `e0378c5` changed D; this track's source was unchanged. Run
+`run-061d28326788` passed all five gates and recorded 48.462629
+machine points. The board retained the earlier best 49.643708.
+At 22:50:46 UTC on 2026-10-30, the overall display was 51.884, rank 35.
+This rerun does not establish a new algorithm improvement, final judging or an award.

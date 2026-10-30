@@ -283,3 +283,64 @@ local gate required peak RSS at most 78% of baseline, speedup at least 0.90 and
 proxy at least 1.035. It passed. The combined measurement does not separate the
 benefit of earlier buffer release from compact distance storage, and does not
 establish an official score.
+
+## Compact distances and early input release — official observation
+
+Commit `e0378c5` ran as `run-4aacdafae970` from 22:49:53 to 22:49:54 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.790007 s, M = 217,931,776 bytes, S = 292, D = 1,
+K = 9.542026 and 48.982031 machine points. D improved by 0.337241 points
+from 48.644790, but missed the predeclared 49.3-point threshold by 0.317969.
+The score-target hypothesis failed; the upload, runtime and correctness checks
+did not. The valid new best is retained without a timing-only retry.
+
+Against the prior best run, official peak memory fell about 27.6%
+(301,199,360 to 217,931,776 bytes), while runtime rose about 5.6%
+(0.748345 to 0.790007 s). S increased from 252 to 292. The local full-input
+median had risen only about 1.1%; the local proxy was not an official score
+prediction. These combined measurements do not isolate the effects of compact
+distance storage and earlier input release.
+
+At 22:50:46 UTC, the board displayed 51.884 overall, rank 35. A, B and C
+had unchanged source and lower measurements in this dispatch; their earlier
+bests remained on the board. These are live machine results, not final judging,
+an award or payment.
+
+## Current phase diagnostic and 32-bit CSR indexes
+
+A private, boundary-instrumented copy of the accepted compact-distance version
+measured graph preparation at a median 0.432 s and the parallel worker interval
+at 0.530 s on the full input. Forward and reverse edge-array fills each took
+about 0.10 s. Worker durations overlap and are not added together. In five
+interleaved full pairs, whole-process medians were 0.950 s without instrumentation
+and 0.968 s with it, a 1.9% increase. Every output matched the published hash.
+These measurements identified construction and graph access as costs to examine.
+
+The candidate narrows CSR offsets and fill cursors from 64 to 32 bits. The
+specified full edge count is 5,000,000; a checked conversion rejects counts
+that do not fit before prefix sums are built. Edge ordering within each row,
+search policy, distance storage and 64-bit path arithmetic are unchanged.
+
+An independent adjacency-multiset oracle checked both graph directions, including
+empty rows, duplicates and self-loops. The existing queue and distance properties
+also passed. Seven host examples ran at one, two, six and twelve workers. On
+109 adversarial/random graphs, repeated and reversed all-pairs queries matched
+Bellman-Ford at one and six workers, including concentrated in/out-degree cases.
+Tiny seeds 22, 23 and reserved 24 matched the reference and Bellman-Ford at all
+four worker counts; source was frozen before seed 24 was generated. Sample/full
+published hashes matched at one, two and six workers. The offline, read-only,
+unprivileged Docker run also matched.
+
+Five interleaved baseline/candidate pairs used six workers on the same Victus
+CPU environment. Time resolution was 0.01 seconds.
+
+| Input | Baseline median time | Candidate median time | Baseline peak RSS | Candidate peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Sample | 0.05 s | 0.05 s | 30,764 KiB | 28,716 KiB |
+| Full | 0.98 s | 0.92 s | 212,736 KiB | 192,688 KiB |
+
+The full median fell about 6.1%, for a 1.0652x speedup, and peak RSS fell about
+9.4%. Simple nonblank code lines rose from 284 to 285; this is not the board's
+source-size measure. The rough K-ratio proxy was 1.052174. The fixed local gate
+required speedup at least 1.05, peak RSS at most 95% of baseline and proxy at
+least 1.03. It passed. The local proxy is not an official score.

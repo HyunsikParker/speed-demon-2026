@@ -25,12 +25,13 @@ impl Numbers<'_> {
 }
 
 struct Graph {
-    offsets: Vec<usize>,
+    offsets: Vec<u32>,
     edges: Vec<(u32, u32)>,
 }
 impl Graph {
     fn build(n: usize, triples: &[(u32, u32, u32)], reverse: bool) -> Self {
-        let mut offsets = vec![0; n + 1];
+        u32::try_from(triples.len()).expect("edge count exceeds u32");
+        let mut offsets = vec![0u32; n + 1];
         for &(u, v, _) in triples {
             offsets[if reverse { v } else { u } as usize + 1] += 1;
         }
@@ -41,7 +42,7 @@ impl Graph {
         let mut edges = vec![(0, 0); triples.len()];
         for &(u, v, w) in triples {
             let (a, b) = if reverse { (v, u) } else { (u, v) };
-            edges[cursor[a as usize]] = (b, w);
+            edges[cursor[a as usize] as usize] = (b, w);
             cursor[a as usize] += 1;
         }
         Self { offsets, edges }
@@ -193,7 +194,7 @@ impl Search {
         if opposite != u64::MAX {
             *best = (*best).min(d + opposite);
         }
-        for &(v, w) in &graph.edges[graph.offsets[u]..graph.offsets[u + 1]] {
+        for &(v, w) in &graph.edges[graph.offsets[u] as usize..graph.offsets[u + 1] as usize] {
             let v = v as usize;
             let next = d + u64::from(w);
             let current = self.dist.get(v);

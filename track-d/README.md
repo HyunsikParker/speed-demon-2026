@@ -12,6 +12,12 @@ an edge preserves its weight rather than borrowing the
 weight of a separate edge in the opposite direction. Parallel edges, duplicate
 edges, self-loops and zero weights retain their specified meaning.
 
+CSR offsets and fill cursors use 32-bit integers too. The full input has
+5,000,000 edges, so every prefix sum and cursor fits; construction checks that
+the edge count fits before building the arrays. Offsets are converted to the
+platform index type only when accessing an edge slice. This does not narrow
+path distances or change which edges belong to each node.
+
 Each query alternates between a forward Dijkstra search from the source and a
 reverse search from the target. A vertex reached by both searches supplies an
 upper bound from a real directed path. The search stops only when the sum of
