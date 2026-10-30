@@ -10,11 +10,11 @@ the preceding byte and skip any partial starting line, then finish the last line
 they own. This preserves requests that cross range boundaries without copying
 the whole input into memory. It does not assume timestamp order.
 
-The first 13
-bytes of each fixed-width UTC timestamp identify its hour, so grouping does not
-require a date parser. Hour prefixes and endpoint byte strings are interned into
-integer IDs separately in each worker. Each endpoint has 72 group slots, matching the
-specified time span; input order does not determine output order.
+The first 13 bytes of each fixed-width UTC timestamp identify its hour, so
+grouping does not require a date parser. Hour prefixes and endpoint byte strings are interned into
+integer IDs separately in each worker. Each endpoint starts with an empty group
+vector. The vector grows through the highest local hour ID used for that endpoint. Missing group slots and
+empty merge sources are skipped; input order does not determine output order.
 
 Each group keeps its latencies as `u32` values and its error count as `u64`.
 Duplicate requests are retained. A status beginning with `5` is an error because
@@ -46,9 +46,9 @@ Rust standard library only; no external crates or analytics libraries.
 Codex developed the implementation and validation. [PERF.md](PERF.md) records
 the measurements and their limits.
 
-## Next work
+## Limits
 
-Per-worker interners and 72-slot group arrays increase peak memory, especially on
-the sample. A future change should measure that replicated state and the merge
-phase before reducing allocations. Exact latency values, duplicate counts and
-byte-ordered output must remain unchanged.
+Group vectors still include empty slots before the highest observed local hour
+ID, and vector capacity can exceed its length. Memory therefore depends on how
+hours and endpoints are distributed across ranges. Merging, percentile sorting
+and output remain serial. Exact latency values and duplicate counts are kept.

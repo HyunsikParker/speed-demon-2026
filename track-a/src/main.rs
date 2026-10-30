@@ -34,11 +34,17 @@ impl Aggregate {
                 let id = self.endpoints.len();
                 self.endpoints.push(endpoint.to_vec());
                 self.endpoint_ids.insert(endpoint.to_vec(), id);
-                self.groups
-                    .push((0..72).map(|_| Group::default()).collect());
+                self.groups.push(Vec::new());
                 id
             }
         }
+    }
+    fn group(&mut self, endpoint: usize, hour: usize) -> &mut Group {
+        let groups = &mut self.groups[endpoint];
+        if groups.len() <= hour {
+            groups.resize_with(hour + 1, Group::default);
+        }
+        &mut groups[hour]
     }
     fn add(&mut self, line: &[u8]) {
         // Fixed-width UTC timestamps make the first 13 bytes the exact hour key.
@@ -59,7 +65,7 @@ impl Aggregate {
         for &digit in &line[cursor + 5..line.len() - 1] {
             latency = latency * 10 + u32::from(digit - b'0');
         }
-        let group = &mut self.groups[e][h];
+        let group = self.group(e, h);
         group.latencies.push(latency);
         group.errors += u64::from(line[cursor + 1] == b'5');
     }
@@ -68,7 +74,10 @@ impl Aggregate {
         for (endpoint, groups) in other.endpoints.into_iter().zip(other.groups) {
             let e = self.endpoint(&endpoint);
             for (h, mut source) in groups.into_iter().take(hours.len()).enumerate() {
-                let dest = &mut self.groups[e][hours[h]];
+                if source.latencies.is_empty() {
+                    continue;
+                }
+                let dest = self.group(e, hours[h]);
                 dest.errors += source.errors;
                 if dest.latencies.is_empty() {
                     dest.latencies = source.latencies;
@@ -85,7 +94,9 @@ impl Aggregate {
         endpoint_order.sort_unstable_by(|&a, &b| self.endpoints[a].cmp(&self.endpoints[b]));
         for h in hour_order {
             for &e in &endpoint_order {
-                let group = &mut self.groups[e][h];
+                let Some(group) = self.groups[e].get_mut(h) else {
+                    continue;
+                };
                 let n = group.latencies.len();
                 if n == 0 {
                     continue;

@@ -161,3 +161,49 @@ Commit `47a7c57` changed D; this track's source was unchanged. Run
 machine points. This is a new same-source best over 48.193324; it does not establish
 a new A algorithm improvement.
 At 22:11:03 UTC, the overall display was 48.815, rank 34.
+
+## Parallel-range candidate — official observation
+
+Commit `014bdb7` ran as `run-5d356b404ed7` from 22:22:43 to 22:22:44 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.206909 s, M = 59,494,400 bytes, S = 174, D = 1,
+K = 13.735267 and 56.891855 machine points. This exceeds the registered 51.0-point
+gate and the previous A best of 48.208906 by 8.682949 points (calculated).
+Compared with that best run, T fell about 69.0% and M rose about 60.0%.
+
+At 22:23:46 UTC, the page displayed 51.600 overall, rank 35. The best three were
+A = 56.891855, B = 49.643708 and D = 48.644790. B and C retained their earlier
+best scores. D improved slightly in the same dispatch, with unchanged source;
+that difference is not an A algorithm improvement. These are live board
+observations, not the final five-run measurement, judged total or award.
+
+## Lazy endpoint-hour groups — local comparison
+
+The accepted parallel-range version allocated 72 `Group` slots for every
+endpoint in every worker. The candidate starts each vector empty and grows it
+through the hour ID being written. It also skips empty source groups while
+merging and missing slots while producing output. The line ownership rule,
+full-key merge, raw latency values and duplicate handling are unchanged.
+
+The frozen candidate passed every byte-cut and reverse-merge test, 47 oracle
+fixtures (including sparse and permuted 72-hour inputs), and tiny seeds 10, 11
+and 12 at one, two, six and twelve workers. Seed 12 was reserved until 10 and 11
+passed. The official reference and independent heap oracle agreed. Published
+sample/full hashes matched at one, two and six workers. An offline, read-only,
+unprivileged Docker run also matched the full output hash.
+
+Five interleaved baseline/candidate pairs ran on the same Victus CPU environment
+with six workers. `/usr/bin/time` reports hundredths of a second, so equal times
+here do not establish identical runtimes.
+
+| Input | Baseline median time | Candidate median time | Baseline peak RSS | Candidate peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Sample | 0.04 s | 0.04 s | 36,988 KiB | 22,356 KiB |
+| Full | 0.18 s | 0.18 s | 52,972 KiB | 39,784 KiB |
+
+Full peak RSS fell about 24.9%. The simple nonblank-code-line count rose from
+166 to 177; it is not the board's source-size measure. The rough K-ratio proxy
+was 1.048788, including that source-size penalty. The predeclared local gate
+required RSS at most 80% of baseline, speedup at least 0.90 and proxy at least
+1.03. It passed. These measurements are local evidence; official points must
+come from the board.

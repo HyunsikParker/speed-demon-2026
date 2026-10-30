@@ -200,3 +200,11 @@ Commit `47a7c57` changed D; this track's source was unchanged. Run
 machine points. The board retained the prior best 39.615362. The slower
 measurement came from unchanged source and is not evidence of a code change.
 At 22:11:03 UTC, the overall display was 48.815, rank 34.
+
+## Same-source observation with the A parallel-range push
+
+Commit `014bdb7` changed A; this track's source was unchanged. Run
+`run-4e3efdc75f8e` passed all five gates and recorded 39.022841
+machine points. The board retained the prior best 39.615362.
+At 22:23:46 UTC on 2026-10-30, the overall display was 51.600, rank 35.
+These are live board results, not final judging or an award.

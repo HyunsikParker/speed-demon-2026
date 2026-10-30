@@ -232,3 +232,12 @@ unchanged source; the same dispatch measured lower B and C scores than their
 previous bests. These observations show timing variation and are retained in
 the respective logs. The live board's best-history display is not the final
 five-run measurement, judged total or award.
+
+## Same-source observation with the A parallel-range push
+
+Commit `014bdb7` changed A; this track's source was unchanged. Run
+`run-d35ed8feb854` passed all five gates and recorded 48.64479
+machine points. This is a new same-source best over 48.602898; it does not establish
+a new D algorithm improvement.
+At 22:23:46 UTC on 2026-10-30, the overall display was 51.600, rank 35.
+These are live board results, not final judging or an award.
