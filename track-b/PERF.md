@@ -2,9 +2,19 @@
 
 ## Live-board history
 
-This first candidate replaces the Python index with a standard-library Rust
-query-term index. It has passed the local checks below; an official live-board
-run has not yet been observed. No official score is claimed here.
+The first candidate replaces the Python index with a standard-library Rust
+query-term index.
+
+| Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
+|---|---|---|---:|---:|---:|---:|
+| `run-750270f3b3c2` | `bc07ea2` | Correct | 5.433148 | 387,010,560 | 4.136591 | 30.832131 |
+
+The [official live board](https://speeddemon.dev/board/) reported this run on
+2026-10-30, from 20:37:54 to 20:38:00 UTC. Check, build, correctness, timeout and
+sandbox gates passed. The board reported S = 174 and D = 1. At 20:39:16 UTC,
+all four tracks had valid scores; the overall display was 40.969, rank 40.
+B was below C, so it was not included in the best-three geometric mean.
+These are live machine points, not final judging or an award.
 
 ## Local validation — 2026-10-30
 

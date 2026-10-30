@@ -4,14 +4,21 @@ An exact directed shortest-path solver for the [Track D specification](https://g
 
 ## Approach
 
-The parser builds compressed sparse row (CSR) adjacency arrays. Each edge keeps
-its destination and weight as 32-bit integers; distances use 64 bits. Parallel
-edges, duplicate edges, self-loops and zero weights retain their specified meaning.
+The parser builds forward and reverse compressed sparse row (CSR) adjacency
+arrays. Each edge keeps its destination and weight as 32-bit integers; distances
+use 64 bits. Reversing an edge preserves its weight rather than borrowing the
+weight of a separate edge in the opposite direction. Parallel edges, duplicate
+edges, self-loops and zero weights retain their specified meaning.
 
-Each query runs forward Dijkstra with a binary heap. A worker reuses its distance
-array between queries, using an epoch array to identify current values instead of
-clearing every distance. By default, up to six workers take independent queries from a shared
-index; answers are written in the original query order after all workers finish.
+Each query alternates between a forward Dijkstra search from the source and a
+reverse search from the target. A vertex reached by both searches supplies an
+upper bound from a real directed path. The search stops only when the sum of
+the two minimum pending distances cannot improve that bound, not at the first
+meeting. Stale heap entries are removed before testing this stopping condition.
+
+A worker reuses two distance arrays and resets only vertices touched by its
+previous query. By default, up to six workers take independent queries from a
+shared index; answers are written in input order after every worker finishes.
 
 Same-node queries return zero before any degree checks. For distinct endpoints,
 a source with no outgoing edges or a target with no incoming edges is unreachable.
@@ -41,6 +48,7 @@ their limits are recorded in [PERF.md](PERF.md).
 
 ## Next work
 
-Measure the worker-count trade-off on the scoring machine before changing the
-default. A separately checked bidirectional search may reduce explored vertices;
-its stopping rule and zero-weight cases need their own correctness tests.
+Measure whether heap operations or graph construction now dominate. Integer
+priority queues could reduce heap work, but they must preserve monotone keys,
+zero weights and large distances. Any such change needs a new correctness check
+and a full-process comparison that includes preprocessing and memory costs.

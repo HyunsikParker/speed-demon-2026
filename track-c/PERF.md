@@ -8,6 +8,7 @@ Rust parser, a direct-index region join and shared name IDs.
 | Run | Commit | Result | T (s) | M (bytes) | K | Machine points |
 |---|---|---|---:|---:|---:|---:|
 | `run-a386410cf9fb` | `0a3e541` | Correct | 1.498349 | 41,844,736 | 4.471266 | 32.521528 |
+| `run-1aa8da2699b7` | `bc07ea2` | Correct, unchanged C source | 1.378084 | 41,967,616 | 4.659556 | 33.417225 |
 
 The [official live board](https://speeddemon.dev/board/) reported this run on
 2026-10-30, from 20:21:22 to 20:21:25 UTC. Check, build, correctness, timeout and
@@ -15,6 +16,11 @@ sandbox gates passed. The board reported S = 172 and D = 1. At 20:22:29 UTC, the
 team's three scored tracks yielded an overall 40.591, rank 40. B was still
 unscored. The overall board uses the geometric mean of the best three tracks;
 these are live machine points, not final judging or an award.
+
+The next run accompanied the first Track B implementation push, with unchanged
+C source. It ran from 20:38:00 to 20:38:02 UTC; all five gates passed
+and S = 172, D = 1 were unchanged. At 20:39:16 UTC, the team's overall display was
+40.969, rank 40. This same-source measurement is not an algorithmic improvement.
 
 ## Local validation — 2026-10-30
 

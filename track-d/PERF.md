@@ -10,6 +10,7 @@ arrays and, by default, up to six independent query workers.
 | `run-d2234e76683a` | `06d5a2c` | Correct | 1.689332 | 222,765,056 | 7.144156 | 42.697548 |
 | `run-f0f2ac9f797d` | `8a1a566` | Correct, unchanged D source | 1.725366 | 222,875,648 | 7.068459 | 42.466237 |
 | `run-44b5bb312166` | `0a3e541` | Correct, unchanged D source | 1.701160 | 222,834,688 | 7.118832 | 42.620437 |
+| `run-518ec8eea2ab` | `bc07ea2` | Correct, unchanged D source | 1.795418 | 222,773,248 | 6.929828 | 42.036124 |
 
 The [official live board](https://speeddemon.dev/board/) and its linked data feed
 reported this result on 2026-10-30 at 15:30–15:31 UTC. The run started at 15:30:18
@@ -31,6 +32,59 @@ unchanged D source. It ran from 20:21:25 to 20:21:27 UTC; all five gates passed
 and S = 155, D = 1 were unchanged. The board retained the first run's 42.697548
 as D's best history. With A, C and D scored, the team displayed an overall
 40.591, rank 40, at 20:22:29 UTC.
+
+The next run accompanied the first Track B implementation push, with unchanged
+D source. It ran from 20:38:02 to 20:38:04 UTC; all five gates passed
+and S = 155, D = 1 were unchanged. The page retained 42.697548 from the first run
+as D's best history. At 20:39:16 UTC, the team's overall display was
+40.969, rank 40. This same-source measurement is not an algorithmic improvement.
+
+## Bidirectional candidate — local comparison, 2026-10-30
+
+A private phase-timing copy of the accepted forward solver spent 0.413 s reading
+and building the graph, and about 2.001 s answering queries, out of 2.414 s total.
+Its output still matched the published full hash. This identified query work as
+the first optimization target; these instrumented timings are not board scores.
+
+The second candidate builds reverse CSR too, alternates exact forward/reverse
+Dijkstra steps, and stops at a minimum-frontier-distance bound. Touched lists
+replace epoch arrays so each worker can reuse both distance arrays. It still
+uses six workers by default. The extra graph and frontier state cost memory.
+
+The comparison used the same Victus CPU and compiler settings as the baseline.
+Three runs of each version were interleaved in the order old/new/new/old/old/new,
+with six workers. Every run read the full inputs, built its graph, answered all
+queries and wrote the output; all output hashes matched. No tuning followed
+these measurements.
+
+| Public seed 1 data | Forward median wall time | Bidirectional median wall time | Forward maximum peak RSS (KiB) | Bidirectional maximum peak RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Sample | 0.06 s | 0.06 s | 22,524 | 36,644 |
+| Full | 2.33 s | 1.11 s | 218,208 | 291,304 |
+
+Full wall times were 2.33, 2.28 and 2.33 s for the baseline, and 1.11, 1.11 and
+1.12 s for the candidate. The median speedup was about 2.10×, with roughly 33.5%
+more peak process RSS. Sample times were equal at GNU `time`'s printed precision.
+These process measurements do not establish official T, cgroup M or K; no
+live-board result for this second candidate has been observed yet.
+
+Correctness checks for the second candidate passed:
+
+- All seven official hand-written cases with 1, 6 and 12 workers.
+- All pairs in 103 adversarial and randomly generated directed graphs, checked
+  against independent Bellman–Ford distances. Cases included an incorrect
+  first-meeting trap, one-way bridges, zero cycles and asymmetric large weights.
+- Tiny seeds 13 and 14, followed by reserved seed 15 with the source frozen.
+  Each included all host query categories and matched both the official
+  reference and Bellman–Ford.
+- Published sample/full output hashes and full input hashes.
+- Full output in the offline-built container as uid 65534 with no network,
+  read-only root, 6 CPUs, 8 GB memory, no swap and a 1 GB tmpfs. Image size:
+  30,047,129 bytes. This was a runtime-contract check, not official scoring.
+
+Tested second-candidate `src/main.rs` SHA-256:
+`78a1c00a192e68253f6310fd9343b50d2650d793962db06d6af4790028152fc2`.
+Codex implemented this candidate and performed the comparisons.
 
 ## Local validation — 2026-10-30
 
