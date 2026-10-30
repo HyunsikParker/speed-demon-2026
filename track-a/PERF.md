@@ -1,5 +1,57 @@
 # Track A: performance log
 
+## Parallel byte-range candidate — local comparison, 2026-10-30
+
+The accepted serial source's private instrumentation reached output at
+0.409214 s and finished at 0.459818 s, with the published full output hash.
+That measurement put roughly 89% of the local run before output. This candidate
+divides the file into six line-aligned ranges and merges exact group data before
+the existing sort-and-output stage. It keeps the whole-file input off the heap,
+but duplicates the workers' interners and group-slot arrays.
+
+Three paired runs used the same idle Victus CPU, interleaved as
+old/new/new/old/old/new. Each timed process read the input, parsed and aggregated
+it, merged where needed, sorted groups and wrote the complete output.
+
+| Public seed 1 data | Serial median wall time | Parallel median wall time | Serial maximum peak RSS (KiB) | Parallel maximum peak RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Sample | 0.05 s | 0.04 s | 11,716 | 37,228 |
+| Full | 0.45 s | 0.17 s | 27,372 | 53,100 |
+
+Full wall times were 0.46, 0.45 and 0.42 s for the baseline, and 0.18, 0.16 and
+0.17 s for the candidate: a median speed ratio of about 2.65, with 1.94 times
+the peak process RSS. The sample's memory ratio was larger, about 3.18; fixed
+per-worker structures matter more at that scale. These are local wall-time and
+process-RSS observations, not official T or cgroup M measurements.
+
+A simple nonblank, noncomment source-line count grew from 86 to 166; it is not
+the board's formatted S count. Combining the full local timing, RSS and source
+proxies gives a K ratio of about 1.291. The preregistered full-data gate required
+a speed ratio of at least 1.50, an RSS ratio no greater than 2.50 and a K proxy
+ratio of at least 1.10. All three passed without a parameter sweep.
+
+Correctness checks completed before any official push:
+
+- Every possible byte cut in a fixed multi-hour example, including empty edge
+  ranges, plus many-way partitions merged in reverse order. The expected output
+  was specified independently and included duplicate requests.
+- Forty-five fixtures at 1, 2, 6 and 12 workers against the independent heap-based
+  oracle: empty and single-line files, the worked and edge examples, all 500 legal
+  status values, duplicates, and 40 shuffled random cases. The edge example covers
+  nearest-rank rounding, month rollover and endpoint byte order.
+- Tiny seeds 7 and 8, followed by reserved seed 9 with the source frozen, at all
+  four worker counts. Both the official reference and the heap oracle agreed.
+- Published sample/full input and output hashes, separate 1- and 2-worker runs,
+  and every six-worker timed run.
+- Exact full output in the offline-built Docker image as uid 65534, with no
+  network, read-only root, 6 CPUs, 8 GB memory, no swap and a 1 GB tmpfs.
+  The image was 30,071,197 bytes.
+
+Tested parallel candidate `src/main.rs` SHA-256:
+`7c083c9c6a59fa04807666359936d4d1e7c00c1c11721b88c243536294b32726`.
+Codex implemented and validated the change. Its official result was not available
+when this comparison was recorded; the private scoring inputs remain unseen.
+
 ## Live-board history
 
 The first candidate replaces Python timestamp parsing and object-heavy groups
@@ -101,3 +153,11 @@ Commit `a3a4156` changed B; this track's source was unchanged. Run
 `run-78501d9c5869` passed all five gates and recorded 48.00429
 machine points. The board retained the prior best 48.193324.
 At 21:50:14 UTC, the overall display was 48.330, rank 35.
+
+## Same-source observation with the D radix push
+
+Commit `47a7c57` changed D; this track's source was unchanged. Run
+`run-5bc81b8f4f7d` passed all five gates and recorded 48.208906
+machine points. This is a new same-source best over 48.193324; it does not establish
+a new A algorithm improvement.
+At 22:11:03 UTC, the overall display was 48.815, rank 34.

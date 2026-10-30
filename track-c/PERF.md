@@ -192,3 +192,11 @@ machine points. This is a new same-source best, up from 39.509831;
 it does not establish a new C algorithm improvement. C remains outside
 the best three tracks used for the overall display.
 At 21:50:14 UTC, the overall display was 48.330, rank 35.
+
+## Same-source observation with the D radix push
+
+Commit `47a7c57` changed D; this track's source was unchanged. Run
+`run-d4e568e622b5` passed all five gates and recorded 38.602265
+machine points. The board retained the prior best 39.615362. The slower
+measurement came from unchanged source and is not evidence of a code change.
+At 22:11:03 UTC, the overall display was 48.815, rank 34.

@@ -217,3 +217,11 @@ A post-push correctness check, with identical source, also confirmed the
 published sample/full output hashes at one and two workers. The pre-push
 sample/full timing checks used six workers; fixtures and tiny seeds had already
 covered one, two and six. No code change or second push was made.
+
+## Same-source observation with the D radix push
+
+Commit `47a7c57` changed D; this track's source was unchanged. Run
+`run-f9d697ef68a5` passed all five gates and recorded 47.584457
+machine points. The board retained the prior best 49.643708. The slower
+measurement came from unchanged source and is not evidence of a code change.
+At 22:11:03 UTC, the overall display was 48.815, rank 34.

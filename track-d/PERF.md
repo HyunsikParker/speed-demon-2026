@@ -216,3 +216,19 @@ Commit `a3a4156` changed B; this track's source was unchanged. Run
 `run-0d50cd164bbb` passed all five gates and recorded 46.896596
 machine points. The board retained the prior best 47.183334.
 At 21:50:14 UTC, the overall display was 48.330, rank 35.
+
+## Radix-queue candidate — official observation
+
+Commit `47a7c57` ran as `run-171aac4335e7` from 22:10:39 to 22:10:40 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.750944 s, M = 301,494,272 bytes, S = 252, D = 1,
+K = 9.376871 and 48.602898 machine points. This exceeds the registered 48.2-point
+gate and the previous D best of 47.183334 by 1.419564 points (calculated).
+Compared with that best run, T fell about 17.8% and M rose about 0.9%.
+
+At 22:11:03 UTC, the page displayed 48.815 overall, rank 34. The best three were
+B = 49.643708, D = 48.602898 and A = 48.208906. A's small new best came from
+unchanged source; the same dispatch measured lower B and C scores than their
+previous bests. These observations show timing variation and are retained in
+the respective logs. The live board's best-history display is not the final
+five-run measurement, judged total or award.
