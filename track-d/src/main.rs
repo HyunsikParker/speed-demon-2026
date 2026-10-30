@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
 use std::{env, fs, thread};
@@ -61,6 +62,7 @@ impl Graph {
                 input.next().unwrap() as u32,
             ));
         }
+        drop(bytes);
         [
             Self::build(n, &triples, false),
             Self::build(n, &triples, true),
@@ -118,31 +120,67 @@ impl RadixHeap {
     }
 }
 
+struct Distances {
+    small: Vec<u32>,
+    wide: HashMap<usize, u64>,
+}
+impl Distances {
+    const WIDE: u32 = u32::MAX - 1;
+    fn new(n: usize) -> Self {
+        Self {
+            small: vec![u32::MAX; n],
+            wide: HashMap::new(),
+        }
+    }
+    fn get(&self, node: usize) -> u64 {
+        let value = self.small[node];
+        if value < Self::WIDE {
+            u64::from(value)
+        } else if value == u32::MAX {
+            u64::MAX
+        } else {
+            self.wide[&node]
+        }
+    }
+    fn set(&mut self, node: usize, value: u64) {
+        if value < u64::from(Self::WIDE) {
+            if self.small[node] == Self::WIDE {
+                self.wide.remove(&node);
+            }
+            self.small[node] = value as u32;
+        } else {
+            self.small[node] = Self::WIDE;
+            self.wide.insert(node, value);
+        }
+    }
+}
+
 struct Search {
-    dist: Vec<u64>,
+    dist: Distances,
     touched: Vec<usize>,
     heap: RadixHeap,
 }
 impl Search {
     fn new(n: usize) -> Self {
         Self {
-            dist: vec![u64::MAX; n],
+            dist: Distances::new(n),
             touched: Vec::new(),
             heap: RadixHeap::new(),
         }
     }
     fn start(&mut self, source: usize) {
         for u in self.touched.drain(..) {
-            self.dist[u] = u64::MAX;
+            self.dist.small[u] = u32::MAX;
         }
+        self.dist.wide.clear();
         self.heap.clear();
-        self.dist[source] = 0;
+        self.dist.set(source, 0);
         self.touched.push(source);
         self.heap.push((0, source));
     }
     fn minimum(&mut self) -> Option<u64> {
         while let Some((d, u)) = self.heap.peek() {
-            if d == self.dist[u] {
+            if d == self.dist.get(u) {
                 return Some(d);
             }
             self.heap.pop();
@@ -151,20 +189,23 @@ impl Search {
     }
     fn expand(&mut self, graph: &Graph, other: &Self, best: &mut u64) {
         let (d, u) = self.heap.pop().unwrap();
-        if other.dist[u] != u64::MAX {
-            *best = (*best).min(d + other.dist[u]);
+        let opposite = other.dist.get(u);
+        if opposite != u64::MAX {
+            *best = (*best).min(d + opposite);
         }
         for &(v, w) in &graph.edges[graph.offsets[u]..graph.offsets[u + 1]] {
             let v = v as usize;
             let next = d + u64::from(w);
-            if next < self.dist[v] {
-                if self.dist[v] == u64::MAX {
+            let current = self.dist.get(v);
+            if next < current {
+                if current == u64::MAX {
                     self.touched.push(v);
                 }
-                self.dist[v] = next;
+                self.dist.set(v, next);
                 self.heap.push((next, v));
-                if other.dist[v] != u64::MAX {
-                    *best = (*best).min(next + other.dist[v]);
+                let opposite = other.dist.get(v);
+                if opposite != u64::MAX {
+                    *best = (*best).min(next + opposite);
                 }
             }
         }

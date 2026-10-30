@@ -5,8 +5,10 @@ An exact directed shortest-path solver for the [Track D specification](https://g
 ## Approach
 
 The parser builds forward and reverse compressed sparse row (CSR) adjacency
-arrays. Each edge keeps its destination and weight as 32-bit integers; distances
-use 64 bits. Reversing an edge preserves its weight rather than borrowing the
+arrays. After parsing the edge triples, it releases the input byte buffer before
+building the two CSR directions. Each edge keeps its destination and weight as
+32-bit integers; queue keys, path arithmetic and output use 64 bits. Reversing
+an edge preserves its weight rather than borrowing the
 weight of a separate edge in the opposite direction. Parallel edges, duplicate
 edges, self-loops and zero weights retain their specified meaning.
 
@@ -23,8 +25,12 @@ Nonnegative edge weights ensure that newly queued distances never fall below
 that minimum. Equal keys may be returned in any order, and each new query resets
 the queue to zero. The buckets retain their allocated capacity between queries.
 
-A worker reuses two distance arrays and resets only vertices touched by its
-previous query. By default, up to six workers take independent queries from a
+Each search stores distances below 4,294,967,294 in a `u32` array. The two
+remaining values mark an unvisited node or an exact `u64` value in a hash map.
+Large distances are never truncated. If a shorter path fits inline, its old
+map entry is removed. A worker reuses two such arrays, resets only touched
+vertices and clears the overflow maps for each new query. By default, up to
+six workers take independent queries from a
 shared index; answers are written in input order after every worker finishes.
 
 Same-node queries return zero before any degree checks. For distinct endpoints,
@@ -58,9 +64,9 @@ describes the monotone-queue concept with a maximum queue. This implementation
 uses the corresponding minimum-key invariant and was written independently;
 it does not use the crate or copy its source.
 
-## Next work
+## Limits
 
-Graph construction and the per-worker dense distance arrays still account for
-substantial time and memory. A future change must measure both graph-building
-temporaries and search-state memory: reducing only one phase may leave the
-process-wide peak unchanged. The current change replaces only the priority queue.
+The overflow maps can grow on inputs with many large distances. Inline storage
+adds branches to distance access, and graph construction still needs parsed
+triples alongside CSR storage. The performance log measures the combined
+working-set change; it does not isolate either part's contribution.

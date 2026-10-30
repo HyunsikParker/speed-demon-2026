@@ -241,3 +241,45 @@ machine points. This is a new same-source best over 48.602898; it does not estab
 a new D algorithm improvement.
 At 22:23:46 UTC on 2026-10-30, the overall display was 51.600, rank 35.
 These are live board results, not final judging or an award.
+
+## Same-source observation with the A lazy-group push
+
+Commit `86a95c8` changed A; this track's source was unchanged. Run
+`run-0fde281b7ccd` passed all five gates and recorded 48.543152
+machine points. The board retained the earlier best 48.64479.
+At 22:38:49 UTC on 2026-10-30, the overall display was 51.765, rank 35.
+This rerun is not evidence of a new algorithm, final judging or an award.
+
+## Compact distances and earlier buffer release — local comparison
+
+This candidate changes the memory use of both major phases. It frees graph input
+bytes after parsing and before building the CSR arrays. Each search then keeps
+small distances inline in a `u32` array, with separate unvisited and overflow
+markers. Overflow values remain exact `u64` entries in a hash map. Queue keys,
+path sums and answers retain 64-bit arithmetic. The radix queue and bidirectional
+stopping rule are unchanged.
+
+Four property tests covered radix ordering, duplicate keys, marker boundaries,
+large sums, overflow-to-inline updates and search resets. Seven host examples
+passed at one, two, six and twelve workers. On 107 adversarial/random graphs,
+all-pairs answers in repeated and reversed query orders matched independent
+Bellman-Ford at one and six workers. Tiny seeds 19, 20 and reserved 21 matched
+the reference and Bellman-Ford at all four worker counts. The source was frozen
+before seed 21 was generated. Published sample/full hashes matched at one, two
+and six workers; the offline, read-only, unprivileged Docker run also matched.
+
+Five interleaved baseline/candidate pairs used the same Victus CPU environment
+and six workers. Time resolution was 0.01 seconds.
+
+| Input | Baseline median time | Candidate median time | Baseline peak RSS | Candidate peak RSS |
+| --- | ---: | ---: | ---: | ---: |
+| Sample | 0.06 s | 0.05 s | 38,880 KiB | 30,948 KiB |
+| Full | 0.95 s | 0.96 s | 294,296 KiB | 212,556 KiB |
+
+Full peak RSS fell about 27.8%; the median time rose about 1.1%. The simple
+nonblank-code-line count rose from 244 to 284, not the board's source-size
+measure. The rough K-ratio proxy was 1.037765, including that penalty. The fixed
+local gate required peak RSS at most 78% of baseline, speedup at least 0.90 and
+proxy at least 1.035. It passed. The combined measurement does not separate the
+benefit of earlier buffer release from compact distance storage, and does not
+establish an official score.

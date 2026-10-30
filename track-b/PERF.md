@@ -233,3 +233,11 @@ Commit `014bdb7` changed A; this track's source was unchanged. Run
 machine points. The board retained the prior best 49.643708.
 At 22:23:46 UTC on 2026-10-30, the overall display was 51.600, rank 35.
 These are live board results, not final judging or an award.
+
+## Same-source observation with the A lazy-group push
+
+Commit `86a95c8` changed A; this track's source was unchanged. Run
+`run-e68eefc850e0` passed all five gates and recorded 48.143062
+machine points. The board retained the earlier best 49.643708.
+At 22:38:49 UTC on 2026-10-30, the overall display was 51.765, rank 35.
+This rerun is not evidence of a new algorithm, final judging or an award.

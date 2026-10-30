@@ -207,3 +207,23 @@ was 1.048788, including that source-size penalty. The predeclared local gate
 required RSS at most 80% of baseline, speedup at least 0.90 and proxy at least
 1.03. It passed. These measurements are local evidence; official points must
 come from the board.
+
+## Lazy endpoint-hour groups — official observation
+
+Commit `86a95c8` ran as `run-812e64eace9b` from 22:38:11 to 22:38:12 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.206905 s, M = 50,114,560 bytes, S = 185, D = 1,
+K = 14.084789 and 57.437518 machine points. A improved by 0.545663 points from
+56.891855, but missed the predeclared 57.5-point threshold by 0.062482. That
+score-target hypothesis failed; the upload, runtime and correctness checks did
+not. The valid new best is retained without a timing-only retry.
+
+Official peak memory fell about 15.8%, less than the local 24.9% reduction.
+Official runtime was nearly unchanged (0.206909 to 0.206905 s), while S rose
+from 174 to 185. The local proxy overstated the eventual official gain; it was
+not used as a substitute for this readback.
+
+At 22:38:49 UTC, the board displayed 51.765 overall, rank 35. B, C and D had
+unchanged source and lower measurements in the same dispatch; their earlier
+best scores remained on the board. These are live machine results, not final
+judging, an award or payment.
