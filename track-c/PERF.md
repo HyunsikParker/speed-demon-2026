@@ -183,3 +183,12 @@ machine points. This is a new same-source best, up from 39.433931;
 it does not establish a new C algorithm improvement. C is now outside
 the best three tracks used for the displayed overall score.
 At 21:36:09 UTC, the overall display was 47.174, rank 36.
+
+## Same-source observation with the B automaton push
+
+Commit `a3a4156` changed B; this track's source was unchanged. Run
+`run-cf74054c789c` passed all five gates and recorded 39.615362
+machine points. This is a new same-source best, up from 39.509831;
+it does not establish a new C algorithm improvement. C remains outside
+the best three tracks used for the overall display.
+At 21:50:14 UTC, the overall display was 48.330, rank 35.

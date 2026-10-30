@@ -1,5 +1,3 @@
-use std::cmp::Reverse;
-use std::collections::BinaryHeap;
 use std::fmt::Write;
 use std::sync::atomic::{AtomicI64, AtomicUsize, Ordering};
 use std::{env, fs, thread};
@@ -70,17 +68,67 @@ impl Graph {
     }
 }
 
+struct RadixHeap {
+    buckets: Vec<Vec<(u64, usize)>>,
+    last: u64,
+    len: usize,
+}
+impl RadixHeap {
+    fn new() -> Self {
+        Self {
+            buckets: (0..65).map(|_| Vec::new()).collect(),
+            last: 0,
+            len: 0,
+        }
+    }
+    fn bucket(&self, key: u64) -> usize {
+        (64 - (key ^ self.last).leading_zeros()) as usize
+    }
+    fn clear(&mut self) {
+        for bucket in &mut self.buckets {
+            bucket.clear();
+        }
+        self.last = 0;
+        self.len = 0;
+    }
+    fn push(&mut self, item: (u64, usize)) {
+        assert!(item.0 >= self.last);
+        let bucket = self.bucket(item.0);
+        self.buckets[bucket].push(item);
+        self.len += 1;
+    }
+    fn peek(&mut self) -> Option<(u64, usize)> {
+        if self.len == 0 {
+            return None;
+        }
+        if self.buckets[0].is_empty() {
+            let i = (1..65).find(|&i| !self.buckets[i].is_empty()).unwrap();
+            self.last = self.buckets[i].iter().map(|item| item.0).min().unwrap();
+            while let Some(item) = self.buckets[i].pop() {
+                let bucket = self.bucket(item.0);
+                self.buckets[bucket].push(item);
+            }
+        }
+        self.buckets[0].last().copied()
+    }
+    fn pop(&mut self) -> Option<(u64, usize)> {
+        self.peek()?;
+        self.len -= 1;
+        self.buckets[0].pop()
+    }
+}
+
 struct Search {
     dist: Vec<u64>,
     touched: Vec<usize>,
-    heap: BinaryHeap<Reverse<(u64, usize)>>,
+    heap: RadixHeap,
 }
 impl Search {
     fn new(n: usize) -> Self {
         Self {
             dist: vec![u64::MAX; n],
             touched: Vec::new(),
-            heap: BinaryHeap::new(),
+            heap: RadixHeap::new(),
         }
     }
     fn start(&mut self, source: usize) {
@@ -90,10 +138,10 @@ impl Search {
         self.heap.clear();
         self.dist[source] = 0;
         self.touched.push(source);
-        self.heap.push(Reverse((0, source)));
+        self.heap.push((0, source));
     }
     fn minimum(&mut self) -> Option<u64> {
-        while let Some(&Reverse((d, u))) = self.heap.peek() {
+        while let Some((d, u)) = self.heap.peek() {
             if d == self.dist[u] {
                 return Some(d);
             }
@@ -102,7 +150,7 @@ impl Search {
         None
     }
     fn expand(&mut self, graph: &Graph, other: &Self, best: &mut u64) {
-        let Reverse((d, u)) = self.heap.pop().unwrap();
+        let (d, u) = self.heap.pop().unwrap();
         if other.dist[u] != u64::MAX {
             *best = (*best).min(d + other.dist[u]);
         }
@@ -114,7 +162,7 @@ impl Search {
                     self.touched.push(v);
                 }
                 self.dist[v] = next;
-                self.heap.push(Reverse((next, v)));
+                self.heap.push((next, v));
                 if other.dist[v] != u64::MAX {
                     *best = (*best).min(next + other.dist[v]);
                 }

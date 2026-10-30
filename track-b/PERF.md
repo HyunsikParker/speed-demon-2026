@@ -205,5 +205,15 @@ This was not the official scoring harness.
 Tested `src/main.rs` SHA-256:
 `93b3c83be530f5b756710a185252290821655186148769cb209375b0086a2ea8`.
 
-Codex implemented and validated this change. Its official result is pending
-at this log entry; the local measurements do not establish a final score or award.
+Codex implemented and validated this change. Official live-board run
+`run-7caf434b1ee3`, commit `a3a4156`, finished at 21:49:27 UTC with all five
+gates passing: T = 1.077159 s, M = 191,315,968 bytes, S = 304, D = 1,
+K = 9.83726 and 49.643708 machine points. Compared with the prior B best,
+points rose by 3.477901 and M fell 58.5% (calculated from the official values).
+At 21:50:14 UTC, the overall display was 48.330, rank 35. These are live
+machine results, not final judging or an award.
+
+A post-push correctness check, with identical source, also confirmed the
+published sample/full output hashes at one and two workers. The pre-push
+sample/full timing checks used six workers; fixtures and tiny seeds had already
+covered one, two and six. No code change or second push was made.

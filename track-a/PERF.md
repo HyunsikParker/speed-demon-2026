@@ -94,3 +94,10 @@ Commit `57f452c` changed B; this track's source was unchanged. Run
 `run-332b9702f5a7` passed all five gates and recorded 48.160952
 machine points. The board retained the prior best 48.193324.
 At 21:36:09 UTC, the overall display was 47.174, rank 36.
+
+## Same-source observation with the B automaton push
+
+Commit `a3a4156` changed B; this track's source was unchanged. Run
+`run-78501d9c5869` passed all five gates and recorded 48.00429
+machine points. The board retained the prior best 48.193324.
+At 21:50:14 UTC, the overall display was 48.330, rank 35.

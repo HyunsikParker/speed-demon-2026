@@ -1,5 +1,48 @@
 # Track D: performance log
 
+## Radix-queue candidate — local comparison, 2026-10-30
+
+A fresh instrumented copy of the accepted bidirectional solver reached graph
+readiness at 0.445 s and finished at 1.175 s. The remaining roughly 0.730 s was
+the concurrent search interval, not the sum of worker times. This prompted a
+queue-only change; CSR construction, distance arrays, bidirectional alternation
+and the default six workers are unchanged.
+
+Three baseline/candidate pairs ran in interleaved order on the same idle Victus
+CPU, including input parsing, graph construction, all queries and output.
+
+| Public seed 1 data | Binary-heap median | Radix-heap median | Binary-heap maximum peak RSS (KiB) | Radix-heap maximum peak RSS (KiB) |
+|---|---:|---:|---:|---:|
+| Sample | 0.07 s | 0.06 s | 36,784 | 39,136 |
+| Full | 1.14 s | 0.95 s | 291,652 | 294,216 |
+
+Full wall times were 1.14, 1.13 and 1.15 s for the baseline, and 0.94, 0.95 and
+0.95 s for the candidate. The median speed ratio was 1.20, with about 0.9% more
+peak process RSS. These local measurements are not official T or cgroup M.
+A source-line proxy grew from 197 to 244 lines; it is not the board's formatted
+S count. Combining those local proxies gives a K ratio of about 1.059. The fixed
+local gate required a speed ratio of at least 1.15, an RSS ratio no greater than
+1.12, and a K proxy ratio of at least 1.05. It passed without further tuning.
+
+Before any official push, correctness checks passed:
+
+- Independent ordered-multiset tests for queue minima, duplicate entries,
+  equal keys, every bit boundary, zero increments, `u64::MAX` and repeated resets.
+- All seven host cases with 1, 6 and 12 workers; all-pairs Bellman–Ford agreement
+  on 103 adversarial and random directed graphs.
+- Tiny seeds 16 and 17, then reserved seed 18 with the source frozen. Every host
+  query category was present, and both the reference and Bellman–Ford agreed.
+- All published sample/full input and output hashes. Separate 1- and 2-worker
+  runs and all six-worker timed runs matched the expected output.
+- Exact full output in the offline-built container, uid 65534, with no network,
+  read-only root, 6 CPUs, 8 GB memory, no swap and a 1 GB tmpfs. The image was
+  30,047,847 bytes.
+
+Tested radix candidate `src/main.rs` SHA-256:
+`a6d8cd2155b757d4b72c15534e5cfc01738b3379cd09e8f7f7ae888a5d228e58`.
+The official private inputs remain unseen. No official radix-candidate result
+was available when this comparison was recorded.
+
 ## Live-board history
 
 The first candidate is a Rust CSR implementation with epoch-tagged distance
@@ -166,3 +209,10 @@ Commit `57f452c` changed B; this track's source was unchanged. Run
 `run-9644ded2c069` passed all five gates and recorded 47.157433
 machine points. The board retained the prior best 47.183334.
 At 21:36:09 UTC, the overall display was 47.174, rank 36.
+
+## Same-source observation with the B automaton push
+
+Commit `a3a4156` changed B; this track's source was unchanged. Run
+`run-0d50cd164bbb` passed all five gates and recorded 46.896596
+machine points. The board retained the prior best 47.183334.
+At 21:50:14 UTC, the overall display was 48.330, rank 35.
