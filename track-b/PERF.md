@@ -257,3 +257,247 @@ Commit `2f5cdaf` changed D; this track's source was unchanged. Run
 machine points. The board retained the earlier best 49.643708.
 At 23:07:03 UTC on 2026-10-30, the overall display was 52.170, rank 34.
 This rerun does not establish a new algorithm improvement, final judging or an award.
+
+## Same-source observation with the popped-vertex meeting push
+
+Commit `b94f7ff` changed D; this track's source was unchanged. Run
+`run-6525f42a83b9` passed all five gates and recorded 49.38212
+machine points. The board retained the earlier best 49.643708.
+At 23:53:09 UTC on 2026-10-30, the overall display was 52.240, rank 35.
+This rerun does not establish a new algorithm improvement, final judging or an award.
+
+
+## Rejected local experiment: query-word hashing
+
+A hash-only candidate on 2026-10-31 replaced the query-word map's default
+hasher with FNV-1a, retaining byte-key equality, collision resolution and all
+search algorithms. Forced-collision tests, every shard boundary, host edge
+cases, phrase overlaps, Unicode handling, seeds 34/35 and reserved seed 36
+passed. The published sample/full hashes and offline unprivileged container
+output also matched.
+
+Five interleaved full pairs measured median wall time of 1.10 s for the
+accepted code and 1.07 s for the candidate, a 1.028x ratio. Maximum process RSS
+was 185,264 and 185,356 KiB. The local coefficient-ratio proxy was
+1.006818, below the fixed 1.20 gate; speedup also missed the 1.50 gate.
+These process-RSS and source-line proxies are not official scoring values.
+The candidate was not pushed. The accepted source was restored, and hash
+constant or seed sweeps are not justified by this result.
+
+
+## Current-source CPU diagnostic
+
+Two private software-CPU profiles of the accepted source on 2026-10-31
+contained 1,274 and 1,284 samples. Exact ELF inline/source mapping placed
+341/340 samples at the query-word lookup, 207/210 at posting-list append, and
+94/100 at the preceding duplicate-document check. The dictionary lookup
+therefore accounts for 26.8%/26.5% of samples; append and duplicate checking
+together account for 23.6%/24.1%. These are CPU sample locations, not wall-time
+phase shares or proof of allocation or cache-miss costs. Other DSOs account
+for 18.3%/19.2% and remain unresolved.
+
+The source and published full output were unchanged. The initial analysis
+misread the report's abbreviated `1K` sample header. Exact event rows from the
+saved profiles corrected the count and matched the sum of per-location counts;
+the workload was not rerun. Static inline frames do not reconstruct a runtime
+callgraph, and the single unprofiled control does not isolate profiler overhead.
+
+
+## Adaptive Boolean postings — local rejection, 2026-10-31
+
+This candidate kept sparse document lists as vectors and converted observed dense
+lists to offset bitsets. It switched back when the document span grew too sparse.
+Phrase matching, the token dictionary and the six document shards were unchanged.
+
+All correctness checks passed, including representation changes, word boundaries,
+large IDs, every three-term Boolean operator combination, shard boundaries, the
+host cases, independent per-document predicates, seeds 37/38 and reserved seed 39.
+Published sample/full hashes and the constrained offline container check passed.
+
+Five interleaved full-data pairs on the same otherwise idle Victus machine had
+median times of 1.12 s for the accepted source and 1.21 s for the candidate.
+Maximum process RSS was 185,268 versus 164,624 KiB. Memory fell 11.1%, but runtime
+increased 8.0%. The simple nonblank, noncomment line count rose from 296 to 424.
+These are local measurements, not official T, cgroup memory.peak or normalized S.
+
+The fixed gate required a speed ratio of at least 0.95, no RSS increase and a
+combined time/memory/source-size coefficient ratio of at least 1.20. The measured
+ratios were 0.92562, 0.88857 and 0.93340 respectively. The candidate failed and
+was not pushed to the board. The accepted source was restored; no density
+threshold sweep or lower acceptance gate was used. Codex implemented and tested
+this candidate.
+
+## Compact query-token trie — 2026-10-31
+
+A private candidate built a compact trie from the query vocabulary and matched
+words while scanning ASCII tokens. Child masks and contiguous child spans kept
+the trie smaller than a dense transition table. The existing Boolean postings,
+phrase automaton, shard boundaries and output logic were unchanged.
+
+All 17 validation groups and five private tests passed, including every byte
+split in the shard fixture, ASCII classification, prefixes, absent words,
+generated vocabulary and the 32-byte token limit. Tiny seeds 40 and 41, then
+reserved seed 42, matched the reference and independent per-document oracle.
+The published sample/full hashes and constrained offline container output also
+matched.
+
+Five interleaved full-data pairs measured median wall times of 1.111188365 s
+for the accepted code and 1.085468384 s for the trie: a 1.023695× speedup.
+Peak process RSS rose from 185,248 to 190,888 KiB. The source-adjusted local
+coefficient proxy was 0.975412; its line-count inputs were 296 and 363, not
+an official S measurement. Timings used a blocking child wait under a separate
+600-second outer limit.
+
+The candidate missed the fixed speedup ≥ 1.30 and coefficient-proxy ≥ 1.10
+gates. Its RSS ratio, 1.030446, was within the 1.05 limit. It was rejected
+without a board push, and the accepted source was restored. This result does
+not show that dictionary lookup is free; it shows that this trie did not reduce
+the total cost enough to justify its size and memory use.
+
+## Inline document stamp — 2026-10-31
+
+A separate candidate kept each Boolean term's last-seen document ID plus one
+in its metadata. This removed the posting-vector tail read from duplicate
+checks. The dictionary, tokenizer, phrase automaton, postings and query logic
+were unchanged; the zero initial stamp could not match a valid document.
+
+All 16 validation groups and both private boundary/summary tests passed, with
+tiny seeds 43 and 44 followed by reserved seed 45. The full offline container
+output also matched. Five interleaved full-data pairs measured 1.104265414 s
+for the accepted code and 0.994869191 s for the candidate, a 1.109960× speedup.
+Peak process RSS was 185,296 versus 185,308 KiB. The local coefficient proxy
+was 1.051941, using source-line proxies of 296 and 299.
+
+This missed the fixed 1.15× speed and 1.06 coefficient-proxy gates. The
+standalone candidate was not pushed. Its measured reduction in execution time
+is retained as evidence for a separately registered integration; the original
+baseline and adoption gates remain in place.
+
+## Exact word-lookup cache with the stamp — 2026-10-31
+
+The next candidate combined the fixed document stamp with a 1,024-slot
+per-worker lookup cache. Cache entries held the complete token bytes, length
+and resolved term ID, including absent terms. Every hit required exact byte
+equality; collisions fell back to the unchanged dictionary. Tokens longer
+than 32 bytes also used the dictionary. Cache placement and capacity were
+fixed before testing and were not tuned to a seed.
+
+All 16 validation groups and four private tests passed, including forced
+known/unknown collisions and repeated eviction. Tiny seeds 46 and 47, then
+reserved seed 48, matched both independent implementations. Published hashes
+and the full constrained offline container output matched as well.
+
+Five interleaved full-data pairs measured 1.147780619 s for the accepted code
+and 1.027011652 s for the combined candidate, a 1.117593× speedup. Peak process
+RSS was 185,272 versus 185,484 KiB. The local coefficient proxy was
+1.038880, using source-line proxies of 296 and 332.
+
+The combined candidate missed the unchanged 1.15× speed and 1.06
+coefficient-proxy gates, so it was not pushed. These measurements compare the
+combination against the original accepted code. They do not isolate the cache's
+contribution relative to the separate stamp experiment. The accepted source
+was restored; no cache-capacity or placement sweep was run.
+
+## Current-code phase timing — 2026-10-31
+
+A private copy of accepted source `93b3c83b` added coarse monotonic timestamps
+around preprocessing, each shard's indexing and query evaluation, major-index
+release, join and output. The earlier phase probe used the superseded positional
+index, so its phase shares did not describe the current streaming implementation.
+No counters were added inside the token loop, and the submitted source stayed
+unchanged.
+
+One sample profile and two full profiles matched the published output hashes.
+Two exact-source full controls took 1.139715 and 1.171590 s; the instrumented
+runs took 1.200161 and 1.123394 s. Across the 12 full-data shard observations,
+indexing occupied 87.03–89.05% of each shard's measured phase interval, query
+and summary evaluation 10.66–12.69%, and explicit major-index release
+0.22–0.44%. Preprocessing took 0.030–0.034 s and final output 0.008–0.012 s.
+
+These overlapping worker durations cannot be added to obtain process wall
+time. Logging and explicit drops may affect the timings; this diagnostic does
+not establish an efficiency gain or identify allocator internals. It supports
+keeping the index as the main target and testing a bounded reduction of redundant
+query-result materialization. It gives no reason to replace the allocator solely
+to accelerate teardown.
+
+## Direct final-query summaries — 2026-10-31
+
+This candidate combined the fixed document stamp with direct accumulation of
+the final Boolean operation's count, ID sum and ten smallest IDs. Intermediate
+Boolean operations still built sorted lists. Single-term and phrase queries
+borrowed their existing lists instead of cloning them before summarization.
+The set visitor retained the accepted unbalanced-intersection shortcut and
+left-to-right operator order.
+
+All 16 validation groups and four private tests passed, including independent
+BTreeSet comparisons for empty, overlapping, unbalanced and high-ID lists.
+Tiny seeds 49 and 50, then reserved seed 51, matched the reference and independent
+oracle. Published hashes and full offline container output matched.
+
+Five interleaved full-data pairs measured 1.105568737 s for the accepted code
+and 1.025490100 s for the candidate, a 1.078088× speedup. Peak process RSS rose
+from 185,216 to 188,976 KiB. The local coefficient proxy was 1.019748, using
+source-line proxies of 296 and 325. The candidate missed the fixed 1.15× speed
+and 1.06 coefficient-proxy gates and was not pushed. The original accepted
+source was restored. This combined test does not isolate the query reduction's
+effect from the stamp's effect.
+
+
+## Bounded bitmap blocks — rejected, 2026-10-31
+
+This candidate replaced full-lived posting lists with 512-document bitmaps.
+Each worker evaluated queries after a block and retained only counts, ID sums
+and the first ten matching IDs. The block size was fixed before measurement;
+no size sweep was run. ASCII tokenization, phrase matching and six workers
+were unchanged.
+
+All 17 correctness groups passed, including every byte-shard boundary,
+512-document rollover and partial blocks, the independent per-document oracle,
+tiny seeds 61 and 62 followed by reserved seed 63, and published sample/full
+hashes. Five interleaved full pairs used the pinned images and the published
+child timer. Their middle-three means were 1.123471812 s for the accepted code
+and 1.162477289 s for this candidate; both spread checks passed. Native peak
+process RSS fell from 185,292 to 95,028 KiB. RSS is a proxy, not the official
+cgroup memory peak. The source-adjusted coefficient proxy was 1.1110 times
+the baseline, below the fixed 1.15 gate; the 0.5129 RSS ratio also missed its
+0.40 gate. The candidate was not submitted.
+
+An allocation audit found 8,564,352 bytes of bitmap rows for phrase-only terms
+that were never written, plus 7,275,648 bytes of phrase bitmap rows across six
+workers. These are allocation formulas from the frozen source and full query
+metadata, not measured attribution of RSS. The source also reserved ten IDs
+for every query/shard summary before any match. This supports testing active
+bitmap rows, sparse phrase results and lazy summary allocation while keeping
+the block size and acceptance gates fixed. Codex implemented and checked the
+candidate.
+
+
+## Active bitmap rows — 2026-10-31
+
+The revised implementation allocates a block bitmap row only when a Boolean
+term occurs. Phrase results use sparse, deduplicated document-ID lists, and a
+query summary allocates its first-ten storage on the first match. The block
+size remains 512 documents, with the same dictionary, phrase automaton and
+six workers. This removes unused storage identified in the preceding audit.
+
+The frozen candidate passed the same 17 correctness groups, using tiny seeds
+64 and 65 followed by reserved seed 66. Published sample/full hashes matched
+in every timed run. Five interleaved full pairs of the pinned images, measured
+inside the container with the published child timer, gave middle-three means
+of 1.121360152 s for the accepted code and 0.954795051 s for the candidate:
+a 1.1745× ratio. Both middle-three spread checks passed.
+
+Native peak process RSS was 185,356 KiB for the baseline and 61,684 KiB for the
+candidate, a ratio of 0.3328. This is not canonical cgroup memory.peak. The
+nonblank, noncomment source-line proxy grew from 296 to 319, with no dependency
+change. Combining the image timing, RSS and source proxies gave a 1.3354×
+coefficient ratio. It passed the original time, memory and coefficient gates;
+the official box must still establish the score. Victus WSL timings and its
+writable private timer-output mount do not reproduce the full official harness.
+
+Tested `src/main.rs` SHA-256:
+`be3f3095e8b1bd8311ecd05645364651bd00fd97de670e14edc2ebde9d987cd2`.
+
+Codex implemented the revision and ran the checks. No official score gain is
+claimed from these local measurements.

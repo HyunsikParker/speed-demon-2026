@@ -5,7 +5,6 @@ use std::path::Path;
 
 #[derive(Default)]
 struct Term {
-    docs: Vec<u32>,
     needed: bool,
 }
 
@@ -14,53 +13,6 @@ struct Query {
     ops: Vec<u8>,
     phrase: bool,
     pattern: usize,
-}
-
-fn combine(a: &[u32], b: &[u32], op: u8) -> Vec<u32> {
-    if op == b'A' && a.len().min(b.len()) < a.len().max(b.len()) / 16 {
-        let (small, big) = if a.len() < b.len() { (a, b) } else { (b, a) };
-        return small
-            .iter()
-            .copied()
-            .filter(|x| big.binary_search(x).is_ok())
-            .collect();
-    }
-    let mut out = Vec::new();
-    let (mut i, mut j) = (0, 0);
-    while i < a.len() && j < b.len() {
-        if a[i] < b[j] {
-            if op != b'A' {
-                out.push(a[i]);
-            }
-            i += 1;
-        } else if a[i] > b[j] {
-            if op == b'O' {
-                out.push(b[j]);
-            }
-            j += 1;
-        } else {
-            if op != b'N' {
-                out.push(a[i]);
-            }
-            i += 1;
-            j += 1;
-        }
-    }
-    if op != b'A' {
-        out.extend_from_slice(&a[i..]);
-    }
-    if op == b'O' {
-        out.extend_from_slice(&b[j..]);
-    }
-    out
-}
-
-fn answer(q: &Query, index: &[Term]) -> Vec<u32> {
-    let mut result = index[q.terms[0]].docs.clone();
-    for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
-        result = combine(&result, &index[term].docs, op);
-    }
-    result
 }
 
 #[derive(Default)]
@@ -139,6 +91,69 @@ impl Automaton {
 
 type Summary = (usize, u64, Vec<u32>);
 
+// One cache-line bitmap per term holds a bounded block of 512 documents.
+const WORDS: usize = 8;
+
+fn block_mask(slots: &[usize], masks: &[[u64; WORDS]], term: usize) -> [u64; WORDS] {
+    match slots[term] {
+        usize::MAX => [0; WORDS],
+        slot => masks[slot],
+    }
+}
+
+fn flush_block(
+    masks: &mut Vec<[u64; WORDS]>,
+    slots: &mut [usize],
+    queries: &[Query],
+    summaries: &mut [Summary],
+    base: u32,
+) {
+    for (q, summary) in queries.iter().zip(summaries) {
+        if q.phrase {
+            continue;
+        }
+        let mut possible = slots[q.terms[0]] != usize::MAX;
+        for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
+            if op == b'A' {
+                possible &= slots[term] != usize::MAX;
+            }
+            if op == b'O' {
+                possible |= slots[term] != usize::MAX;
+            }
+        }
+        if !possible {
+            continue;
+        }
+        let mut result = block_mask(slots, masks, q.terms[0]);
+        for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
+            let rhs = block_mask(slots, masks, term);
+            for (bits, right) in result.iter_mut().zip(rhs) {
+                *bits = match op {
+                    b'A' => *bits & right,
+                    b'O' => *bits | right,
+                    _ => *bits & !right,
+                };
+            }
+        }
+        for (word, mut bits) in result.into_iter().enumerate() {
+            summary.0 += bits.count_ones() as usize;
+            while bits != 0 {
+                let id = base + (word * 64 + bits.trailing_zeros() as usize) as u32;
+                summary.1 += u64::from(id);
+                if summary.2.len() < 10 {
+                    if summary.2.is_empty() {
+                        summary.2.reserve_exact(10);
+                    }
+                    summary.2.push(id);
+                }
+                bits &= bits - 1;
+            }
+        }
+    }
+    masks.clear();
+    slots.fill(usize::MAX);
+}
+
 fn shard(
     path: &Path,
     names: &HashMap<Vec<u8>, usize>,
@@ -148,14 +163,12 @@ fn shard(
     start: u64,
     end: u64,
 ) -> std::io::Result<Vec<Summary>> {
-    let mut index: Vec<Term> = needed
-        .iter()
-        .map(|&needed| Term {
-            needed,
-            ..Term::default()
-        })
-        .collect();
+    let mut masks = Vec::<[u64; WORDS]>::new();
+    let mut slots = vec![usize::MAX; names.len()];
     let mut matches = vec![Vec::<u32>::new(); ac.patterns];
+    let mut summaries: Vec<Summary> = queries.iter().map(|_| (0, 0, Vec::new())).collect();
+    let mut base = 0;
+    let mut rows = 0;
     let mut file = File::open(path)?;
     file.seek(SeekFrom::Start(start.saturating_sub(1)))?;
     let mut reader = BufReader::with_capacity(1 << 20, file);
@@ -181,6 +194,16 @@ fn shard(
             assert_eq!(doc, expected);
         }
         next_doc = Some(doc.checked_add(1).unwrap());
+        if rows == WORDS * 64 {
+            flush_block(&mut masks, &mut slots, queries, &mut summaries, base);
+            rows = 0;
+        }
+        if rows == 0 {
+            base = doc;
+        }
+        let word = rows / 64;
+        let bit = 1u64 << (rows % 64);
+        rows += 1;
         line[tab + 1..].make_ascii_lowercase();
         let mut state = 0;
         let mut at = tab + 1;
@@ -194,9 +217,12 @@ fn shard(
                 at += 1;
             }
             if let Some(&id) = names.get(&line[start..at]) {
-                let term = &mut index[id];
-                if term.needed && term.docs.last() != Some(&doc) {
-                    term.docs.push(doc);
+                if needed[id] {
+                    if slots[id] == usize::MAX {
+                        slots[id] = masks.len();
+                        masks.push([0; WORDS]);
+                    }
+                    masks[slots[id]][word] |= bit;
                 }
                 state = ac.step(state, id);
                 for &pattern in &ac.nodes[state].output {
@@ -210,21 +236,20 @@ fn shard(
         }
         line.clear();
     }
-    Ok(queries
-        .iter()
-        .map(|q| {
-            let ids = if q.phrase {
-                matches[q.pattern].clone()
-            } else {
-                answer(q, &index)
-            };
-            (
+    if rows != 0 {
+        flush_block(&mut masks, &mut slots, queries, &mut summaries, base);
+    }
+    for (q, summary) in queries.iter().zip(&mut summaries) {
+        if q.phrase {
+            let ids = &matches[q.pattern];
+            *summary = (
                 ids.len(),
                 ids.iter().map(|&id| u64::from(id)).sum(),
                 ids[..ids.len().min(10)].to_vec(),
-            )
-        })
-        .collect())
+            );
+        }
+    }
+    Ok(summaries)
 }
 
 fn main() -> std::io::Result<()> {

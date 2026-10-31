@@ -7,16 +7,21 @@ An exact Boolean and phrase-query engine for the
 
 The program reads the queries first and interns their terms. Up to six workers
 share that read-only dictionary and process disjoint document ranges. Boolean
-query terms retain sorted, unique document-ID lists. Phrase queries become a
-shared token-pattern automaton; no positional posting lists are stored.
+queries use blocks of 512 documents. A worker allocates a bitmap row only when
+a queried Boolean term occurs in that block. Phrase queries become a shared
+token-pattern automaton; no positional posting lists are stored.
 
 Tokenization lowercases ASCII bytes and splits on every byte outside `a`–`z`
 and `0`–`9`. It performs no Unicode normalization or case folding. Numeric tokens
 remain byte strings: `007` and `7` are distinct.
 
-Boolean operations merge sorted lists in the order written. `NOT` is a binary
-set difference; `AND` has no precedence over `OR`. An intersection with a large
-list-size imbalance binary-searches the larger list for each smaller-list ID.
+Boolean operations combine eight-word bitmaps in the order written. `NOT` is
+a binary set difference; `AND` has no precedence over `OR`. Missing rows are
+zero masks. A conservative presence check can skip a query that cannot match;
+it never uses a right-hand `NOT` term's presence to conclude that a result is
+empty. After each block, workers accumulate counts, ID sums and the smallest
+ten IDs, then clear the active bitmap rows. Summary storage is allocated on
+the first match.
 
 Phrase matching uses an independently implemented Aho–Corasick automaton over
 token IDs. It is built from the supplied queries during the timed run. Failure
@@ -25,6 +30,7 @@ Identical phrase queries share one pattern ID but keep separate output lines.
 Each worker resets the automaton at every document boundary. A token absent from
 the query dictionary also resets it, so omitted terms cannot create adjacency.
 Repeated matches of one phrase in a document contribute only one document ID.
+Those matches use sparse document-ID lists and are summarized after the shard.
 The [algorithm's all-overlap semantics](https://docs.rs/aho-corasick/latest/aho_corasick/)
 are relevant here; this implementation does not use that crate or its code.
 
@@ -64,7 +70,7 @@ the measurements and their limits.
 
 ## With another 24 hours
 
-Measure indexing and query time separately before replacing the posting layout.
-Frequent terms may benefit from bitmaps, but sparse queries would pay for scans
-of empty words. Compare that tradeoff with the sorted-list version while keeping
-all-overlap phrase matching and left-to-right Boolean semantics unchanged.
+Measure active-row lookup and Boolean-query evaluation separately. Repeated
+Boolean prefixes may share work, but a shared expression graph would need to
+preserve left-to-right evaluation and be tested against the independent oracle
+and full end-to-end measurements before adoption.
