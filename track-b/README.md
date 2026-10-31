@@ -11,6 +11,16 @@ queries use blocks of 512 documents. A worker allocates a bitmap row only when
 a queried Boolean term occurs in that block. Phrase queries become a shared
 token-pattern automaton; no positional posting lists are stored.
 
+The dictionary uses fixed-size slots holding the first eight bytes, byte length
+and original term ID. Short keys are exact in the slot; longer keys also require
+full byte equality. Linear probing resolves collisions, including shared
+prefixes, and the table is built from the supplied queries during the run.
+
+Each query stores its terms and operators inline, using the specification's
+bounds of six Boolean terms or eight phrase terms. Term IDs are checked before
+conversion to 32 bits. The actual length excludes padding from evaluation and
+phrase construction. These records retain the original sequential query order.
+
 Tokenization lowercases ASCII bytes and splits on every byte outside `a`–`z`
 and `0`–`9`. It performs no Unicode normalization or case folding. Numeric tokens
 remain byte strings: `007` and `7` are distinct.
@@ -70,7 +80,7 @@ the measurements and their limits.
 
 ## With another 24 hours
 
-Measure active-row lookup and Boolean-query evaluation separately. Repeated
-Boolean prefixes may share work, but a shared expression graph would need to
-preserve left-to-right evaluation and be tested against the independent oracle
-and full end-to-end measurements before adoption.
+Compare the full-size live and held-out measurements, then profile the
+remaining dictionary and bitmap work on the accepted source. Any further
+change should preserve the exact tokenizer, query order and collision checks,
+and pass the same independent oracle and whole-program efficiency gates.

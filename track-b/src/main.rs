@@ -3,14 +3,92 @@ use std::fs::{self, File};
 use std::io::{BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
 use std::path::Path;
 
+#[derive(Clone, Copy, Default)]
+struct WordSlot {
+    head: u64,
+    id: u32,
+    len: u32,
+}
+
+struct Dictionary {
+    slots: Vec<WordSlot>,
+    long_words: Vec<Box<[u8]>>,
+    shift: u32,
+}
+
+impl Dictionary {
+    fn head(word: &[u8]) -> u64 {
+        let n = word.len().min(8);
+        let mut bytes = [0; 8];
+        bytes[..n].copy_from_slice(&word[..n]);
+        u64::from_le_bytes(bytes)
+    }
+
+    fn bucket(&self, head: u64) -> usize {
+        (head.wrapping_mul(0x9e3779b97f4a7c15) >> self.shift) as usize
+    }
+
+    fn new(names: HashMap<Vec<u8>, usize>) -> Self {
+        let capacity = (names.len().max(1) * 2).next_power_of_two();
+        let mut dict = Self {
+            slots: vec![WordSlot::default(); capacity],
+            long_words: vec![Box::default(); names.len()],
+            shift: 64 - capacity.trailing_zeros(),
+        };
+        for (word, id) in names {
+            dict.long_words[id] = word.into_boxed_slice();
+        }
+        for id in 0..dict.len() {
+            let word = &dict.long_words[id];
+            let head = Self::head(&word);
+            let mut at = dict.bucket(head);
+            while dict.slots[at].len != 0 {
+                at = (at + 1) & (capacity - 1);
+            }
+            dict.slots[at] = WordSlot {
+                head,
+                id: u32::try_from(id).unwrap(),
+                len: u32::try_from(word.len()).unwrap(),
+            };
+            if word.len() <= 8 {
+                dict.long_words[id] = Box::default();
+            }
+        }
+        dict
+    }
+
+    fn len(&self) -> usize {
+        self.long_words.len()
+    }
+
+    fn get(&self, word: &[u8]) -> Option<usize> {
+        let head = Self::head(word);
+        let mut at = self.bucket(head);
+        loop {
+            let slot = self.slots[at];
+            if slot.len == 0 {
+                return None;
+            }
+            if slot.head == head && slot.len as usize == word.len() {
+                let id = slot.id as usize;
+                if word.len() <= 8 || self.long_words[id].as_ref() == word {
+                    return Some(id);
+                }
+            }
+            at = (at + 1) & (self.slots.len() - 1);
+        }
+    }
+}
+
 #[derive(Default)]
 struct Term {
     needed: bool,
 }
 
 struct Query {
-    terms: Vec<usize>,
-    ops: Vec<u8>,
+    terms: [u32; 8],
+    ops: [u8; 5],
+    len: u8,
     phrase: bool,
     pattern: usize,
 }
@@ -38,7 +116,8 @@ impl Automaton {
         let mut edges = HashMap::new();
         for q in queries.iter_mut().filter(|q| q.phrase) {
             let mut state = 0;
-            for &term in &q.terms {
+            for &term in &q.terms[..q.len as usize] {
+                let term = term as usize;
                 state = *edges.entry((state, term)).or_insert_with(|| {
                     let child = ac.nodes.len();
                     ac.nodes.push(Node::default());
@@ -112,21 +191,27 @@ fn flush_block(
         if q.phrase {
             continue;
         }
-        let mut possible = slots[q.terms[0]] != usize::MAX;
-        for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
+        let mut possible = slots[q.terms[0] as usize] != usize::MAX;
+        for (&op, &term) in q.ops[..q.len as usize - 1]
+            .iter()
+            .zip(&q.terms[1..q.len as usize])
+        {
             if op == b'A' {
-                possible &= slots[term] != usize::MAX;
+                possible &= slots[term as usize] != usize::MAX;
             }
             if op == b'O' {
-                possible |= slots[term] != usize::MAX;
+                possible |= slots[term as usize] != usize::MAX;
             }
         }
         if !possible {
             continue;
         }
-        let mut result = block_mask(slots, masks, q.terms[0]);
-        for (&op, &term) in q.ops.iter().zip(&q.terms[1..]) {
-            let rhs = block_mask(slots, masks, term);
+        let mut result = block_mask(slots, masks, q.terms[0] as usize);
+        for (&op, &term) in q.ops[..q.len as usize - 1]
+            .iter()
+            .zip(&q.terms[1..q.len as usize])
+        {
+            let rhs = block_mask(slots, masks, term as usize);
             for (bits, right) in result.iter_mut().zip(rhs) {
                 *bits = match op {
                     b'A' => *bits & right,
@@ -156,7 +241,7 @@ fn flush_block(
 
 fn shard(
     path: &Path,
-    names: &HashMap<Vec<u8>, usize>,
+    names: &Dictionary,
     needed: &[bool],
     queries: &[Query],
     ac: &Automaton,
@@ -216,7 +301,7 @@ fn shard(
             while at < line.len() && line[at].is_ascii_alphanumeric() {
                 at += 1;
             }
-            if let Some(&id) = names.get(&line[start..at]) {
+            if let Some(id) = names.get(&line[start..at]) {
                 if needed[id] {
                     if slots[id] == usize::MAX {
                         slots[id] = masks.len();
@@ -268,14 +353,15 @@ fn main() -> std::io::Result<()> {
             &row[5..]
         };
         let mut q = Query {
-            terms: Vec::new(),
-            ops: Vec::new(),
+            terms: [0; 8],
+            ops: [0; 5],
+            len: 0,
             phrase,
             pattern: usize::MAX,
         };
         for (i, word) in body.split(|&c| c == b' ').enumerate() {
             if !phrase && i % 2 == 1 {
-                q.ops.push(word[0]);
+                q.ops[q.len as usize - 1] = word[0];
                 continue;
             }
             let id = *names.entry(word.to_vec()).or_insert_with(|| {
@@ -283,12 +369,15 @@ fn main() -> std::io::Result<()> {
                 index.len() - 1
             });
             index[id].needed |= !phrase;
-            q.terms.push(id);
+            q.terms[q.len as usize] = u32::try_from(id).unwrap();
+            q.len += 1;
         }
+        assert!((if phrase { 2..=8 } else { 1..=6 }).contains(&q.len));
         queries.push(q);
     }
     let needed: Vec<bool> = index.into_iter().map(|term| term.needed).collect();
     let ac = Automaton::new(&mut queries, names.len());
+    let names = Dictionary::new(names);
     let path = data.join("docs.txt");
     let size = fs::metadata(&path)?.len();
     let workers = std::env::var("SD_WORKERS")

@@ -501,3 +501,161 @@ Tested `src/main.rs` SHA-256:
 
 Codex implemented the revision and ran the checks. No official score gain is
 claimed from these local measurements.
+
+
+Official run `run-07e1054d8717` on commit `68ed36d4fcd88ac708773c298b926d313e504a8d`
+finished at 2026-10-31 03:49:47 UTC with all five gates passing. It recorded
+T = 0.987719 s, M = 64,991,232 bytes, S = 327, D = 1, K = 12.610303 and
+55.036276 machine points. That is 5.392568 points above the prior B best.
+At 03:49:56 UTC, the board displayed overall 55.449 and rank 38. A subsequent
+root read confirmed all four tracks had finished on the exact commit. A, C and
+D source bytes were unchanged and their previous best scores remained. These
+are live machine results, not an award or payment. This result note is retained
+locally; no extra push was made just to rerun unchanged code.
+
+
+## Exact short-word lookup — rejected, 2026-10-31
+
+A private candidate used a direct-address table for all 47,988 combinations of
+one to three lowercase ASCII letters or digits. Length-separated base-36
+positions preserved complete byte identity, including leading zeros. Entries
+came from the current query file; longer tokens used the existing standard
+hash map. The tokenizer, phrase automaton, active bitmap blocks and six workers
+were unchanged.
+
+Five private tests passed, including every short key, sparse and absent entries,
+long-key lookup and every byte-shard boundary. All 18 correctness groups passed,
+including tiny seeds 91 and 92 followed by reserved seed 93. Published outputs
+matched in the fixed timed runs.
+
+The pinned-image middle-three means were 0.959844 s for the accepted source
+and 0.922765 s for the candidate, a speed ratio of 1.040183. Both spread checks
+passed. Native peak RSS was 61,680 versus 61,688 KiB. The local source-adjusted
+efficiency proxy was 0.996221, using 319 and 373 nonblank, noncomment lines.
+The candidate missed the unchanged 1.15 speed and 1.06 efficiency gates. It was
+not submitted, and the accepted source was restored.
+
+## Token lookup census
+
+A separate private copy of the accepted source counted query-dictionary hits
+and misses by token length. A manually counted fixture passed. The full run
+matched the published output hash, 250,000 documents and 36,276,657 tokens.
+Of those lookups, 28,716,697 found a query term. There were 10,854,229 tokens
+of one to three bytes: 29.92% of all lookups. Longer keys accounted for the
+remaining 70.08%, including 17,963,796 hits and 7,458,632 misses.
+
+These are work counts, not CPU or wall-time shares. They do not establish why
+the short-word candidate improved elapsed time by the measured amount. No
+instrumented timing was used as a benchmark, and no new official score is claimed.
+
+
+## Query activation — local rejection, 2026-10-31
+
+Two private diagnostics counted Boolean-query visits across 492 document blocks.
+The accepted source visited 15,252,000 Boolean queries; its existing presence
+check allowed 5,241,641 to proceed to exact bitmap evaluation. A condition based
+on the first term and every OR term would skip 45.77% of visits, below the fixed
+50% threshold for an implementation trial.
+
+A second necessary condition starts at the last AND term and includes only
+later OR terms. After that AND, matches must belong to its term set; later NOT
+operations only remove documents, while OR can add its own term set. With no
+AND, the condition starts at the first term. This condition activated 7,615,848
+query visits and skipped 50.07%. No query passing the original presence check
+was omitted. Both diagnostics preserved the published output hash. These
+counts did not establish a runtime improvement.
+
+The candidate stored the second condition in a compact term-to-query index.
+Each worker queued a query once when an anchor term first appeared in a block,
+then used the unchanged exact evaluator. The dictionary, tokenizer, phrase
+automaton, 512-document blocks and six workers were unchanged.
+
+The first private-test build failed because a test predicate mixed integer
+types; the release build passed, and no workload ran. Explicit test-only type
+annotations fixed the error without changing the candidate. The repaired trial
+passed three private tests and all 18 correctness groups, including exhaustive
+mixed operators, repeated and missing terms, duplicate activation, block and
+shard boundaries, and tiny seeds 94, 95 and reserved 96.
+
+Five fixed pinned-image pairs gave middle-three means of 0.972708 s for the
+accepted source and 1.137978 s for the candidate, a speed ratio of 0.854769.
+Both spread checks passed. Native peak RSS was 61,744 versus 62,324 KiB. The
+source-adjusted local efficiency proxy was 0.892685, using line-count proxies
+of 319 and 398. The candidate missed the unchanged speed and efficiency gates.
+
+The accepted source was restored without an official submission. Fewer query
+visits did not improve total runtime in this trial. It did not separately
+measure activation overhead, access order or cache effects, so none is claimed
+as the measured cause. The original compiler failure remains recorded apart
+from this completed performance result.
+
+
+## Inline query records — local rejection, 2026-10-31
+
+A query-only diagnostic measured the accepted representation on the published
+50,000-query input. Each query had a 64-byte header with separate term and
+operator vectors. Including allocated capacities, query storage occupied
+6,225,320 bytes across the outer vector and 79,709 inner allocations.
+
+The candidate put up to eight checked unsigned 32-bit term IDs and five
+operators in each 48-byte record, alongside the actual length, phrase flag and
+existing pattern ID. At the same outer-vector capacity, this required
+3,145,728 bytes: 49.47% less allocated query storage. That estimate excludes
+allocator overhead and does not predict process RSS or runtime. The dictionary,
+tokenizer, sequential query visits, bitmap evaluation, phrase automaton and
+six workers stayed unchanged.
+
+The first validation stopped because a private fixture contained literal
+backslash-n sequences instead of line breaks. Correcting only that fixture
+preserved the candidate bytes and all gates. Four private tests and all 19
+correctness groups then passed, including every byte-shard boundary, bounded
+summaries, all Boolean lengths and operator sequences over repeated terms,
+missing terms, maximum-length phrases, high term-ID bits and tiny seeds 97,
+98 and reserved 99. Published sample and full output hashes matched.
+
+The first timing batch failed the baseline spread check. Its apparent speed
+gain was not accepted. One separately registered measurement repair retained
+the same sources and images, checked idle readiness before each phase and ran
+two warmup pairs followed by five fixed pairs. It introduced no new holdout,
+source change or parameter choice.
+
+Both spread checks passed in that batch. Pinned-image middle-three means were
+0.951543 s for the accepted source and 0.871392 s for the candidate, a speed
+ratio of 1.091980. Native peak RSS was 61,616 versus 57,448 KiB, a ratio of
+0.932355. With source-line proxies of 319 and 330, the local efficiency ratio
+was 1.054345.
+
+The candidate missed the unchanged 1.15 speed and 1.06 efficiency gates. The
+accepted source was restored without an official submission. The fixture
+error, unstable measurement batch and final performance result remain
+separate records; the earlier, larger speed estimate was not selected.
+
+
+## Compact dictionary and query records — local pass, 2026-10-31
+
+This candidate combined the previously measured inline-prefix dictionary with
+the fixed query records. Each isolated version had missed the adoption gates.
+Their separate speed ratios were not added or multiplied to predict a result.
+
+The dictionary retained its original dense term IDs, full-byte equality for
+long keys and fixed probing layout. Query records held those IDs directly,
+so freeing short-key byte buffers could not invalidate a query reference.
+The tokenizer, phrase automaton, sequential query visits, active bitmap
+blocks and six workers were unchanged.
+
+Seven private tests passed, covering exact dictionary lookup, prefix collisions
+and wraparound, missing terms, Boolean order and lengths, high term-ID bits,
+every byte-shard boundary and bounded summaries. All 18 additional case and
+seed groups passed, including tiny seeds 100 and 101 followed by reserved 102.
+Published sample and full outputs matched exactly.
+
+After idle-readiness checks, two pinned-image warmup pairs preceded five fixed
+measurement pairs. Both middle-three spread checks passed. Mean times were
+0.953204 s for the accepted source and 0.813439 s for the candidate, a speed
+ratio of 1.171820. Native peak RSS was 61,620 versus 57,340 KiB, a ratio of
+0.930542. The source-line proxies were 319 and 401, giving a local efficiency
+ratio of 1.061158.
+
+The candidate passed the unchanged 1.15 speed, 1.05 maximum RSS ratio and 1.06
+efficiency gates. These are local measurements; an official score is pending.
+The previous isolated failures remain part of the record.
