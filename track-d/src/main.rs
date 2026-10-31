@@ -47,33 +47,8 @@ impl Graph {
         }
         Self { offsets, edges }
     }
-    fn bfs_order(&self) -> Vec<u32> {
-        let n = self.offsets.len() - 1;
-        u32::try_from(n).expect("node count exceeds u32");
-        let mut order = vec![u32::MAX; n];
-        let mut queue = Vec::with_capacity(n);
-        let mut at = 0;
-        for root in 0..n {
-            if order[root] != u32::MAX {
-                continue;
-            }
-            order[root] = queue.len() as u32;
-            queue.push(root as u32);
-            while at < queue.len() {
-                let u = queue[at] as usize;
-                at += 1;
-                for &(v, _) in &self.edges[self.offsets[u] as usize..self.offsets[u + 1] as usize] {
-                    if order[v as usize] == u32::MAX {
-                        order[v as usize] = queue.len() as u32;
-                        queue.push(v);
-                    }
-                }
-            }
-        }
-        order
-    }
-    fn read(data: &str) -> ([Self; 2], Vec<(usize, usize)>) {
-        let bytes = fs::read(format!("{data}/graph.txt")).expect("read graph");
+    fn read(path: &str) -> [Self; 2] {
+        let bytes = fs::read(path).expect("read graph");
         let mut input = Numbers {
             bytes: &bytes,
             at: 0,
@@ -89,32 +64,10 @@ impl Graph {
             ));
         }
         drop(bytes);
-        let original = Self::build(n, &triples, false);
-        let order = original.bfs_order();
-        drop(original);
-        for (u, v, _) in &mut triples {
-            *u = order[*u as usize];
-            *v = order[*v as usize];
-        }
-        let bytes = fs::read(format!("{data}/queries.txt")).expect("read queries");
-        let mut input = Numbers {
-            bytes: &bytes,
-            at: 0,
-        };
-        let mut queries = Vec::new();
-        while let Some(s) = input.next() {
-            queries.push((
-                order[s as usize] as usize,
-                order[input.next().unwrap() as usize] as usize,
-            ));
-        }
-        drop(order);
-        drop(bytes);
-        let graphs = [
+        [
             Self::build(n, &triples, false),
             Self::build(n, &triples, true),
-        ];
-        (graphs, queries)
+        ]
     }
 }
 
@@ -302,7 +255,16 @@ fn main() {
     let args: Vec<_> = env::args().collect();
     let data = args.get(1).map(String::as_str).unwrap_or("/data");
     let out = args.get(2).map(String::as_str).unwrap_or("/out");
-    let (graphs, queries) = Graph::read(data);
+    let graphs = Graph::read(&format!("{data}/graph.txt"));
+    let bytes = fs::read(format!("{data}/queries.txt")).expect("read queries");
+    let mut input = Numbers {
+        bytes: &bytes,
+        at: 0,
+    };
+    let mut queries = Vec::new();
+    while let Some(s) = input.next() {
+        queries.push((s as usize, input.next().unwrap() as usize));
+    }
     let answers: Vec<_> = (0..queries.len()).map(|_| AtomicI64::new(-1)).collect();
     let next = AtomicUsize::new(0);
     let available = thread::available_parallelism().map_or(1, |n| n.get());

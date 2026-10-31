@@ -607,3 +607,25 @@ source-line proxy rose from 281 to 319; the rough coefficient ratio was 1.077094
 The unchanged gates of 1.12x speedup, at most 1.03x RSS and at least 1.05
 coefficient ratio all passed. This is a local result; official scoring uses
 its own machine, inputs and source-size measurement.
+
+
+## BFS early-release trial — official result and restoration
+
+Commit `3f1dd28` finished official evaluation on 2026-10-31 at 03:06:24 UTC.
+D passed check, build, correctness, timeout and sandbox gates, with
+T = 0.756991 s, M = 196,579,328 bytes, S = 327, D = 1, K = 9.783461
+and 49.524627 machine points. This missed the fixed 51.6-point target and
+was below the previous best of 50.424918. The local speedup did not carry
+over to this official trial. The measurements do not isolate the effects
+of machine, input or run-to-run variation.
+
+At 03:07:33 UTC, the board retained D's 50.425 best and showed 52.537 overall
+at rank 38. A reached 57.929313 on unchanged source; B and C also reran without
+source changes and retained their earlier bests. The small overall increase
+therefore does not demonstrate a gain from the D candidate.
+
+The BFS candidate was rejected after the official trial. The D source and
+README were restored byte-for-byte from `0f25f4a`; this log retains the failed
+trial. A corrective push keeps the final recorded source on the previously
+accepted implementation. It is not another attempt to improve the score by
+rerunning unchanged code. These are live machine results, not an award or payment.
