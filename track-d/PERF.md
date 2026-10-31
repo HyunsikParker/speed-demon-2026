@@ -482,3 +482,128 @@ results must be recorded separately after submission.
 The sample-input medians were 0.04 s for the baseline and 0.05 s for the
 candidate. This small-input regression is one timing-resolution step; the
 predeclared efficiency gate used the full input, where the gain above was measured.
+
+## Popped-vertex meeting checks — official observation
+
+Commit `b94f7ff` ran as `run-e3d5f818fda3` from 23:52:40 to 23:52:41 UTC
+on 2026-10-30. Check, build, correctness, timeout and sandbox gates all passed.
+The feed recorded T = 0.751131 s, M = 197,242,880 bytes, S = 289, D = 1,
+K = 9.9985 and 49.996742 machine points. D improved by 0.199536 points
+from 49.797206, but missed the fixed 50.8-point target by 0.803258.
+The threshold was not lowered. This is a valid new best and a failed score
+hypothesis, with no execution failure or same-code retry.
+
+Against the prior best, official runtime fell about 1.4%
+(0.762079 to 0.751131 s), memory rose about 0.05%
+(197,136,384 to 197,242,880 bytes), and S fell from 293 to 289.
+The local full median had fallen about 9.7%; that magnitude did not carry
+over to this official run. Different inputs and environments may contribute,
+but these observations alone do not identify the cause.
+
+At 23:53:09 UTC, the board displayed 52.240 overall, rank 35, against a leader
+at 77.785. A, B and C had unchanged source and lower measurements in this
+dispatch; their prior bests remained. The valid D improvement is retained.
+These are live machine results, not final judging, an award or payment.
+
+## Post-change profile and rejected paired-distance layout
+
+A private profile of the accepted popped-vertex version collected 594 and
+599 user-space CPU samples. Distance lookup accounted for 273/594 and 296/599
+(46.0% and 49.4%); search expansion accounted for 187 samples in each recording.
+One sample in each recording remained outside the resolved application. Exact
+ELF/debug resolution reused the captured addresses, and all output hashes matched.
+The guest exposed six cores and twelve logical CPUs with affinity 0–11; this does
+not establish equivalence to the official physical machine. Profile/control
+elapsed ratios were 0.921 and 0.885 against one control, so this small set is not
+a stable estimate of instrumentation overhead or a new performance gain.
+
+The next candidate placed both directional inline distances beside each other
+in one per-worker array of two-element u32 pairs. It retained separate exact
+wide-value maps, queues and touched-node lists, with no shared mutable storage
+between workers. The search algorithm and meeting-bound policy were unchanged.
+
+Six property tests passed, including direction-isolated values and resets and
+all 19,683 three-vertex graphs. Host cases, 113 adversarial/random graphs,
+tiny seeds 40, 41 and reserved 42, published hashes and offline Docker execution
+also passed. Source was frozen before the reserved seed was generated.
+
+In five interleaved full-input pairs with six workers, baseline/candidate medians
+were 0.84/0.85 s and peak RSS was 192,324/192,160 KiB. Speedup was 0.988235x;
+the rough K-ratio proxy was 0.993740. Sample medians were 0.04/0.05 s, measured
+at 0.01-second resolution. The candidate missed its fixed full-input speedup
+threshold of 1.10 and proxy threshold of 1.035; it met the memory limit.
+The paired layout was rejected locally and was never pushed. The accepted
+popped-vertex source and official best of 49.996742 were retained.
+
+## Rejected smaller-frontier direction selection
+
+A private candidate expanded the direction with fewer queued radix entries and alternated equal-size ties. It kept exact valid minima, the popped-vertex meeting bound, and the sum-of-minima stopping test. The candidate passed six property tests, including all 19,683 three-vertex directed graphs with absent/zero/unit edges; 117 adversarial and random all-pairs cases; the host cases; tiny seeds 43, 44 and the reserved 45; and the published sample/full hashes. The read-only, unprivileged container also returned the expected full output.
+
+Five interleaved local full-data pairs gave a median of 0.86 s for the accepted source and 0.85 s for the candidate. Peak RSS was 192,576 and 191,516 KiB. The 1.0118x speedup and 1.0048 rough coefficient ratio missed the fixed 1.12x and 1.05 gates. These are local measurements, not official scores.
+
+Private counter copies reduced expanded vertices from 7,158,669 to 7,123,891 and examined edges from 21,075,641 to 20,972,317: about 0.49% fewer in each case. Counter outputs matched the published hash; their counts are not timing attribution. The modest work reduction did not establish the required efficiency gain. The candidate was not submitted, and the accepted source was restored.
+
+## Rejected inlined distance getter
+
+The accepted binary contained four direct calls to `Distances::get`, including one in the neighbour-processing loop. A private candidate marked the common getter `inline(always)` and moved the exact wide-map read to a cold, non-inlined helper. Disassembly confirmed that direct getter calls disappeared. Compact storage, bounds checks, search order and all arithmetic were unchanged.
+
+The candidate passed the six property tests, 19,683 exhaustive three-vertex graphs, 117 adversarial/random cases, host cases, tiny seeds 46/47 and reserved 48, published sample/full hashes, and the unprivileged read-only container check. Five interleaved full pairs gave median times of 0.84 s for both versions. Peak RSS was 192,220 KiB for the baseline and 192,448 KiB for the candidate; the rough coefficient ratio was 0.9966. This missed the fixed 1.12x speedup and 1.05 coefficient gates.
+
+Removing the calls did not produce the required whole-process gain. The earlier CPU-sample attribution identifies where time was sampled, not how much call overhead costs. These results do not establish cache-miss or memory-bandwidth dominance. The candidate was not submitted, and the accepted source was restored.
+
+
+## BFS vertex numbering: two rejected storage designs
+
+The first candidate built a temporary forward CSR graph and visited every vertex
+in breadth-first order, continuing from the next unvisited vertex for disconnected
+components. A bijection remapped both endpoints of every edge and query before
+rebuilding the forward and reverse graphs. Weights, parallel edges, query order
+and the search algorithm were unchanged. All preprocessing was included in timing.
+
+Both designs passed the host cases at one, two, six and twelve workers, the
+exhaustive three-vertex test, 117 adversarial/random all-pairs cases, published
+sample/full output hashes, and the offline unprivileged container check. The
+first used tiny seeds 52/53 and reserved 54. The second used 55/56 and reserved
+57, and matched an independent BFS permutation on 1,233 additional graphs.
+Each reserved input was generated after the candidate source was frozen.
+
+Five interleaved full-data pairs used a blocking child wait and a monotonic
+parent timer. The fixed gates required at least 1.12x speedup, at most 1.03x
+peak RSS and a rough coefficient ratio of at least 1.05.
+
+| Storage design | Baseline/candidate median | Baseline/candidate peak RSS | Speedup | Rough coefficient ratio |
+| --- | --- | --- | --- | --- |
+| Separate BFS queue and inverse map | 0.829925 / 0.703614 s | 192,820 / 198,944 KiB | 1.179517x | 1.059445 |
+| One queue with bitset visitation and in-place permutation inversion | 0.835382 / 0.735016 s | 192,588 / 199,208 KiB | 1.136549x | 1.030893 |
+
+The first design missed only the memory gate. The second retained the same BFS
+order and reduced the workspace during discovery, but whole-process peak RSS did
+not fall; it missed both the memory and coefficient gates. Neither was submitted.
+The coefficient uses a simple nonblank source-line proxy, not the official size
+measurement. No cache-miss attribution was measured. The accepted source was
+restored after each test.
+
+
+## BFS numbering with earlier permutation release
+
+This candidate keeps the first BFS design's traversal and separate queue/map.
+After remapping the edge triples, it reads and remaps the queries, then releases
+the permutation and query input buffer before building the final CSR graphs.
+The source change addresses allocation lifetime. It leaves the search algorithm,
+weights, worker limit and output ordering unchanged.
+
+Eight private properties passed, including the 1,233-graph BFS permutation
+comparison and all 19,683 three-vertex graphs checked against Bellman-Ford.
+Host cases at one, two, six and twelve workers, 117 adversarial/random all-pairs
+cases, tiny seeds 58/59 and reserved 60, published sample/full hashes, and the
+unprivileged offline container check also passed. Seed 60 was generated only
+after the source was frozen.
+
+Five interleaved full-data pairs gave baseline/candidate medians of
+0.849322/0.705578 s: 1.203724x speedup, or about 16.9% less elapsed time.
+Peak RSS was 192,780/192,220 KiB. These whole-process measurements include
+parsing, BFS numbering, query remapping and CSR construction. The nonblank
+source-line proxy rose from 281 to 319; the rough coefficient ratio was 1.077094.
+The unchanged gates of 1.12x speedup, at most 1.03x RSS and at least 1.05
+coefficient ratio all passed. This is a local result; official scoring uses
+its own machine, inputs and source-size measurement.

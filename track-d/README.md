@@ -4,13 +4,20 @@ An exact directed shortest-path solver for the [Track D specification](https://g
 
 ## Approach
 
-The parser builds forward and reverse compressed sparse row (CSR) adjacency
-arrays. After parsing the edge triples, it releases the input byte buffer before
-building the two CSR directions. Each edge keeps its destination and weight as
-32-bit integers; queue keys, path arithmetic and output use 64 bits. Reversing
-an edge preserves its weight rather than borrowing the
-weight of a separate edge in the opposite direction. Parallel edges, duplicate
-edges, self-loops and zero weights retain their specified meaning.
+The parser reads edge triples, releases the input byte buffer and builds a
+temporary forward compressed sparse row (CSR) graph. A breadth-first traversal
+assigns new vertex IDs, starting at each remaining unvisited vertex to cover
+disconnected components. The permutation is computed from the current input.
+It remaps both edge endpoints and all query endpoints; edge weights and query
+order are unchanged. The temporary graph, permutation and query input buffer
+are released before the final forward and reverse CSR arrays are built.
+
+Each edge keeps its destination and weight as 32-bit integers; queue keys,
+path arithmetic and output use 64 bits. Reversing an edge preserves its weight;
+it does not borrow the weight of a separate edge in the opposite direction.
+Parallel edges, duplicate edges, self-loops and zero weights retain their
+specified meaning. The numbering changes storage order only, with no
+reachability or distance shortcut.
 
 CSR offsets and fill cursors use 32-bit integers too. The full input has
 5,000,000 edges, so every prefix sum and cursor fits; construction checks that
