@@ -1,4 +1,254 @@
+# Track C: performance and validation
+
+Snapshot: 2026-10-31. The current source combines inline membership with
+read-only mapping and parallel quote-parity boundary discovery. It passed the
+local adoption gate below; its first official board run is pending. The recorded
+official result still belongs to the prior inline-membership pipeline.
+
+## Recorded official result
+
+Run `run-52f0819fc621`, on commit `1c06a7cd760f25d771fb196b6e111e9b74d2666c`,
+finished at 05:55:45 UTC with all five gates passing and **55.455380 machine points**.
+
+| Official axis | Value |
+|---|---:|
+| T: process time | 0.187834 s |
+| M: cgroup memory peak | 20,283,392 bytes |
+| S: source size | 401 |
+| D: dependency axis | 1 |
+| K: coefficient | 12.856051 |
+
+This improved the prior best of 51.737524 by 3.717856 points and exceeded the
+registered 53.4-point target. The best remained unchanged in the 08:02 UTC
+readback. [MEASUREMENTS.json](../MEASUREMENTS.json) records the own-track observations;
+no final judge score or award is asserted.
+
+## Accepted design
+
+The [implementation notes](README.md) describe the CSV grammar and exact join.
+The input is mapped read-only. Six byte chunks count quotes in parallel using
+runtime-guarded AVX2 masks or a scalar fallback. Prefix parity establishes the
+quote state at five raw cuts; short forward scans move them to complete-record
+boundaries. Six workers borrow the disjoint ranges, forming exact logical-record
+batches targeting 64 KiB. Quoted newlines and oversized records remain intact.
+This removes producer-owned input buffers and queues.
+
+Six workers decode names, count decoded note bytes and accumulate numeric totals.
+Region IDs index a compact country table; absent regions map to `_UNMATCHED`.
+Money remains signed integer cents throughout parsing and aggregation.
+
+Distinct-name counting is shared across workers. A batch groups requests by one
+of 64 mutex-protected shards, locking each nonempty shard once. The first exact
+`(name, country)` pair sets its membership bit and increments one worker's count
+under that lock. The final sum therefore counts each pair once.
+
+Names of at most 16 bytes use complete inline keys and four country-bitset words
+when the table has at most 256 country groups, including `_UNMATCHED`. Length
+is part of identity. Longer
+names and larger country tables retain the full-byte map and variable-size
+bitsets. Worker buffers and request-vector capacities are reused across batches.
+
+## Local evidence for the accepted stages
+
+The first two stages passed their separate whole-program adoption gates. Their baselines
+differ, so the ratios below are not independent effects to multiply together.
+
+| Stage | Baseline → candidate image time | Baseline → candidate native peak RSS | K-ratio proxy |
+|---|---:|---:|---:|
+| Parallel pipeline with retained worker scratch, versus serial source | 0.710919 → 0.183349 s | 18,548 → 24,000 KiB | 1.677626 |
+| Inline membership, versus that accepted pipeline | 0.186579 → 0.152485 s | 24,060 → 19,828 KiB | 1.133347 |
+
+Each row used five interleaved pinned-image pairs and the published child timer
+on an Intel Core i5-12500H running Ubuntu 24.04 under WSL2. Times are middle-three
+means and include input reading, framing, parsing, membership, aggregation and
+output. Both accepted batches passed their spread checks. Native peak process
+RSS and nonblank source-line counts are local proxies for the board's M and S.
+
+The pipeline's first timing batch failed its baseline stability check and was
+not used for adoption. One registered operational repair retained the exact
+sources and images, waited for a quiet foreground WSL session, and ran fixed
+warm-ups before the original five-pair measurement. It changed no service,
+algorithm, parameter or acceptance threshold. The unstable batch remains in the
+history; its apparent gain was not treated as evidence.
+
+## Correctness checks
+
+The accepted inline-membership change passed seven Rust tests and 15 correctness
+groups. They cover every inline-key byte position and length, zero bytes, the
+16/17-byte boundary, country-word boundaries through 513 countries, concurrent
+first-pair updates and scratch reuse. Tiny seeds 43 and 44 passed before reserved
+seed 45 was generated with the source frozen.
+
+CSV validation covers escaped quotes, embedded CR/LF/BOM bytes, trailing spaces,
+empty fields, unknown regions, negative cents, and EOF/LF/CRLF record endings.
+Vector and scalar record scanners are compared across quote states and split
+positions. Host-reference and independent byte-parser results are checked.
+The published full seed-1 `aggregates.txt` SHA-256 is:
+
+`d8088b1cd42ba1338b1345b107b55db7b96ef1f5066f3ff64fd26a8912a0f536`
+
+Build and exact-output checks are described in the [repository README](../README.md#build-and-check).
+
+## Rejected alternatives and limits
+
+The later fused-fingerprint membership table passed ten Rust tests and 15 check
+groups, including deliberate full-fingerprint collisions, table growth and
+concurrent updates. Pinned-image time fell from 0.145918 to 0.143155 s, a
+1.019303× ratio, below the fixed 1.18× requirement. Its source-line proxy grew
+from 393 to 457; the resulting K proxy was 0.985945, below 1.05. Its RSS ratio
+passed the 1.15 limit. The candidate was not submitted and the accepted source
+was restored.
+
+Other measured trials included vector field searches, worker-side framing,
+borrowed fields and shared input blocks. Their exact outcomes remain in the
+history. A reduction in copying, allocations or instructions was not accepted
+as a speed improvement without a passing whole-program comparison.
+
+Producer throughput, decoding and shared membership still contribute work.
+Their sampled CPU locations are not elapsed-time shares. Long-name and
+large-country-table inputs use a different storage path, so measurements on the
+published input do not characterize every legal workload.
+
+## Whole-record structural parsing: rejected local trial
+
+A later candidate scanned each complete record for outside-quote commas and
+cumulative quote counts. One AVX2 pass could cross field boundaries; scalar
+code handled tails and unsupported CPUs. Quote counts gave the decoded note
+length without decoding the note byte by byte. Unescaped names borrowed their
+input slice; escaped names used the worker's scratch buffer. Producer framing,
+membership storage, six workers, 64 shards and batching stayed unchanged.
+
+Ten Rust tests and 15 check groups passed. The new tests compared scalar and
+vector field metadata at every 32-byte boundary and unaligned offset, and
+checked empty fields, escaped quotes, Unicode, BOM bytes and a 2 MiB note.
+Fresh tiny seeds 124 and 125 passed before reserved seed 126. Host-reference
+and independent CSV outputs agreed, as did the published sample/full hashes
+and all 14 image-run outputs.
+
+Five interleaved pinned-image pairs gave middle-three means of 0.150447 s for
+the accepted source and 0.147206 s for the candidate: a 1.022018 speed ratio.
+Native peak process RSS was 20,060 versus 20,016 KiB, a ratio of 0.997807.
+The nonblank source-line proxy rose from 393 to 458, giving a K-ratio proxy of
+0.988437. Both timing spreads passed. Speed missed the fixed 1.18 requirement
+and K missed 1.05; RSS passed its 1.15 limit.
+
+The candidate was not submitted. The accepted source and release binary were
+restored, and their full-output hash was checked again. These local results
+do not establish an official score change. Replacing per-field scans with
+shared metadata did not meet the whole-program adoption gate in this trial.
+
+## Memory-mapped ranges: rejected local trial
+
+This candidate mapped `records.csv` read-only and split it into six ranges at
+complete CSV record boundaries. A sequential quote-parity scan found the cuts;
+each worker then framed and parsed its borrowed range. Input buffers and
+producer channels were removed. Field decoding, country lookup and exact
+shared-name membership stayed unchanged.
+
+Eight Rust tests and 17 check groups passed, including complete-record cuts,
+quoted newlines, an oversized record, concurrent membership, and fresh tiny
+seeds 134 and 135 followed by reserved seed 136. Both image-built binaries
+matched the published sample/full outputs. All 14 timed image outputs matched.
+
+Five interleaved pairs after two warm-up pairs gave middle-three means of
+0.150218 s for the accepted source and 0.154878 s for the candidate. The speed
+ratio was 0.969912; both spread checks passed. Peak container-cgroup memory
+fell from 24,346,624 to 18,317,312 bytes, a ratio of 0.752355.
+
+The data was warmed on the host before each container existed. A common trusted
+shell kept each Docker cgroup alive after the published child timer finished,
+so its `memory.peak` could be read. These are local WSL container measurements;
+the holder and writable timing mount differ from the official parent-cgroup
+harness and its isolation. Process RSS was not used for this mapping trial.
+
+The source-line proxy was 409 versus 412, including the unchanged build files.
+Both dependency weights remained 1. The corrected K-ratio proxy was 1.041371;
+an erroneous image-size factor in the initial calculation was removed during
+verification, with the original record retained. The decision was unchanged:
+speed missed 1.18 and K missed 1.05, while memory passed its 1.05 ratio limit.
+The candidate was not submitted, and the accepted source was left unchanged.
+
+## Parallel quote-parity boundaries: local adoption
+
+The first mapped-range candidate still enumerated every record ending in a
+sequential pass to choose five cuts. This candidate replaces that pass with six
+quote-only parity scans and five boundary searches. CSV decoding, six parsing
+workers and the 64 membership shards are unchanged.
+
+A fixed batch used two warm-up pairs and five interleaved baseline/candidate
+pairs on the same Victus machine. The pinned-image child timer measured these
+whole-program results:
+
+| Measure | Prior pipeline | Parallel-parity mapping |
+|---|---:|---:|
+| Middle-three mean process time | 0.149709 s | 0.124672 s |
+| Maximum measured container memory peak | 20,582,400 bytes | 18,612,224 bytes |
+| Nonblank source-line proxy, including Dockerfile and manifest | 409 | 491 |
+| Dependency axis | 1 | 1 |
+
+Time fell by 16.72% (1.200820× speedup) and measured memory by 9.57%.
+The K-ratio proxy was 1.087865. These passed the fixed requirements of at least
+1.18× speedup, memory ratio at most 1.05 and K proxy at least 1.05; both timing
+spread checks passed. One baseline sample took 0.202381 s. The preregistered
+middle-three calculation drops each arm's fastest and slowest samples, and the
+raw timings are retained.
+
+Eleven Rust tests and 17 validation groups passed. The added tests compare
+scalar/vector quote parity at every alignment and tail, check every possible
+cut in a quoted-record fixture, and exercise a long record that spans multiple
+partitions. Fresh tiny seeds 137 and 138 passed before reserved seed 139; source
+bytes remained frozen. Host-reference and independent byte-parser outputs,
+published sample/full outputs, and all 14 image outputs matched exactly.
+
+Memory comes from each Docker cgroup's `memory.peak`, with the input prewarmed
+outside the container and a common trusted holder keeping the cgroup readable
+after the timed child exits. This is a local measurement, without the official
+parent harness or its timing-file isolation. Source size is a nonblank-line
+proxy, not official `scc`. D is one plus direct runtime dependencies, so both
+arms have D = 1; image size is only a build-limit check. These results qualify
+one official trial and do not establish a board score or prize.
+
+## Record and assistance
+
+The [complete experiment log below](#complete-experiment-log) retains the earlier log byte-for-byte, including
+rejected trials and the operational timing repair. Historical “current” and
+“pending” statements refer to their original snapshots.
+
+Codex developed the implementation and validation.
+
+## Complete experiment log
+
+<details>
+<summary>Open the full chronological record, including rejected trials and measurement repairs</summary>
+
 # Track C: performance log
+
+## Fused inline membership — rejected local candidate, 2026-10-31
+
+This candidate computed one fingerprint for each short decoded name and reused
+it for shard selection and an open-addressed membership table. Each table slot
+kept the complete two-word key, its byte length and four country bitsets.
+Full-key equality decided identity; equal fingerprints did not merge names.
+Long names and sets of more than 256 countries retained the existing fallback.
+CSV parsing, framing, six workers, 64 shards and batch sizes stayed unchanged.
+
+Ten Rust tests passed, including deliberately identical 64-bit fingerprints
+for different keys, repeated table growth, an independent pair-set oracle,
+empty names, all byte positions, country-word boundaries and concurrent
+contention. The 15 recorded check groups covered those tests, the independent
+CSV cases and fresh seeds 121–123, with 123 reserved. Published sample/full
+outputs and all 14 image-run outputs matched.
+
+In the fixed five-pair comparison, pinned-image whole-process time fell from
+0.145918 to 0.143155 s, a speed ratio of 1.019303. Maximum process RSS was
+19,888 versus 19,996 KiB. The nonblank source-line proxy grew from 393 to 457,
+giving a source-adjusted K proxy of 0.985945. Both timing spreads passed.
+The measured speed ratio missed the required 1.18, and K missed 1.05; the
+RSS ratio of 1.005430 passed its 1.15 limit. These are local measurements and
+proxies, not official scores or cgroup-memory results.
+
+The small observed speed gain did not meet the efficiency gate. The candidate
+was not submitted, and the accepted source and native executable were restored.
 
 ## Live-board history
 
@@ -488,3 +738,102 @@ These are local Victus WSL measurements using the published child timer,
 native process RSS and nonblank, noncomment source lines. They do not establish
 an official score or replace official cgroup-memory and scc measurements.
 Official evaluation is still required for this candidate.
+
+## Official live-board result for inline membership
+
+Commit `1c06a7cd760f25d771fb196b6e111e9b74d2666c` was pushed once at
+2026-10-31 05:55:08 UTC. C run `run-52f0819fc621` finished at 05:55:45 UTC
+with all five gates passed: T 0.187834 s, M 20,283,392 bytes, S 401, D 1,
+K 12.856051 and 55.455380 machine points. C's prior best was 51.737524;
+the increase was 3.717856 points. The resulting score exceeded the registered
+target of 53.4.
+
+At 05:56:48 UTC, the board displayed 57.235 overall and rank 39. A, B and D
+reran with unchanged sources and retained their previous bests. These are
+live-board results, not final judging, an award or payment.
+
+## Vector field search: insufficient incremental gain
+
+Candidate v18 added a runtime-guarded AVX2 search for the first comma or quote,
+with scalar tails and a non-AVX2 fallback. Text decoding copied literal spans
+and handled doubled quotes between them; the two per-record numeric delimiter
+scans used the same search. Membership, framing and worker counts were unchanged.
+The older v4 segment decoder used scalar searches on the former serial pipeline;
+its unsuccessful result remains separate.
+
+Nine private Rust tests and all 15 correctness groups passed, including
+unaligned vector boundaries, missing delimiters, tails, escaped text spanning
+block boundaries, wide CSV grammar and reserved tiny seed 48. One stable
+five-pair image batch measured 0.148895 s for accepted v17 and 0.146542 s for
+v18: a speed ratio of 1.016060. The native peak-RSS ratio was 0.983443, while
+the source-line proxy grew from 393 to 426. The incremental K-ratio proxy was
+0.999211, below the fixed 1.08 gate; speed also missed the 1.18 gate.
+
+The candidate was not submitted, and accepted v17 was restored. This batch
+shows insufficient gain for the registered threshold, not an execution failure.
+Its local timing, RSS and source-line proxies are not official measurements.
+Further work needs current pipeline evidence and a distinct mechanism.
+
+## Inline membership with worker-side framing
+
+Candidate v20 combined accepted v17's exact inline-name membership with v15's
+worker-side record framing. The producer emitted complete batches, and workers
+reused vectors to locate individual records. The six-worker configuration,
+64 shards, 64 KiB batch target and 1 MiB reader were unchanged. The earlier v15
+result remains a failed experiment on the older baseline.
+
+Nine private Rust tests and all 15 correctness groups passed, including reserved
+tiny seed 51 and the published sample and full-output hashes. One stable
+five-pair image batch measured 0.150613 s for v17 and 0.133035 s for v20, a speed
+ratio of 1.132135. The native peak-RSS ratio was 1.003224. The source-line proxy
+grew from 393 to 417, and the K-ratio proxy was 1.053921. Speed and efficiency
+missed the fixed gates of 1.18 and 1.08. These local proxies are not official
+measurements.
+
+The candidate was not submitted. Accepted v17 was restored, and the candidate
+and measurements were retained. Further adoption tests need fresh evidence
+and a distinct mechanism; this result does not close the competition path.
+
+## Borrowed names and fused numeric fields
+
+Candidate v22 borrowed contiguous name values from each input row and used a
+reusable decoded buffer only for doubled-quote escapes. It also combined the
+id and region-id delimiter scans with decimal conversion. Note and amount
+parsing, framing, membership and worker counts were unchanged.
+
+Nine private Rust tests and all 15 correctness groups passed, including borrowed
+slice identity, decoded-byte equivalence, numeric boundaries and reserved tiny
+seed 54. One stable five-pair image batch measured 0.151709 s for accepted v17
+and 0.147769 s for v22: a speed ratio of 1.026668. Native peak RSS had a ratio
+of 1.004822, and the source-line proxy grew from 393 to 426. The K-ratio proxy
+was 1.000103. Speed and efficiency missed the fixed 1.18 and 1.08 gates.
+
+The candidate was not submitted; accepted v17 was restored. These local
+measurements do not establish an official score. Current CPU samples justified
+testing the work reduction, but did not predict its end-to-end benefit.
+
+## Shared input blocks: no end-to-end improvement
+
+Candidate v23 read into reusable 1 MiB blocks. Batches contained within one block
+shared immutable byte views; batches crossing a block boundary retained owned
+carry storage. A bounded, nonblocking pool received buffers only after their
+last reader finished. Logical 64 KiB packet boundaries, row order, framing,
+parsing, membership and the six-worker limit were unchanged.
+
+Ten private Rust tests and all 15 correctness groups passed, including reserved
+tiny seed 57. The ownership fixture preserved exact packet bytes and boundaries:
+2,556,452 of its 2,736,709 input bytes used shared views. Other checks covered
+last-reference recycling, a full recycle queue, short and interrupted reads,
+a record spanning more than two blocks, and EOF without a final terminator.
+
+One stable five-pair image batch measured 0.146800 s for accepted v17 and
+0.151270 s for v23, a speed ratio of 0.970453. The native peak-RSS ratio was
+1.039437. Source-line proxies were 393 and 455, giving a K-ratio proxy of
+0.956279. Speed and efficiency missed the fixed 1.18 and 1.08 gates. Reducing
+byte copies did not yield the required whole-process gain in this batch.
+
+The candidate was not submitted, and accepted v17 was restored. These local
+measurements do not establish an official score or identify which remaining
+phase limited throughput. The frozen candidate and results are retained.
+
+</details>

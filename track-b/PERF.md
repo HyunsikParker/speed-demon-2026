@@ -1,3 +1,156 @@
+# Track B: performance and validation
+
+Snapshot: 2026-10-31. This report describes the accepted source in repository
+commit `72deb7d7d2abc47fa32758336a67fcacaa8c3b49`.
+
+## Recorded official result
+
+Official run `run-a9ce34cd1404` on that commit finished at 07:59:24 UTC with
+all five gates passing and **55.479075 machine points**.
+
+| Official axis | Value |
+|---|---:|
+| T: process time | 0.918916 s |
+| M: cgroup memory peak | 59,441,152 bytes |
+| S: source size | 409 |
+| D: dependency axis | 1 |
+| K: coefficient | 12.870087 |
+
+The score improved on the previous best of 55.036276 by 0.442799 points. It missed
+the preregistered 56.5-point target; that threshold failure did not invalidate the
+correct submission or erase the improvement. The source was retained. See
+[MEASUREMENTS.json](../MEASUREMENTS.json) for the recorded own-track values.
+These are live machine scores, not final judging or an award.
+
+## Where the work and storage changed
+
+The [implementation notes](README.md) cover tokenization, Boolean semantics and
+shard ownership. Queries supply the dictionary: the program builds no index for
+words that cannot affect an answer. Up to six workers read disjoint document
+ranges through separate file handles.
+
+Boolean evaluation uses blocks of 512 documents. A term receives a bitmap row
+only when it occurs in the block; absent rows represent zero. Queries fold the
+eight-word masks strictly left to right, with binary `NOT` interpreted as set
+difference. A conservative presence check skips impossible results without
+assuming that the presence of a subtracted term makes the result empty.
+
+Phrase queries use a shared token-ID Aho–Corasick automaton. Matching happens
+while each document is read, so positional posting lists are unnecessary.
+Unknown terms reset the automaton, preserving gaps; document boundaries reset it
+too. Repeated matches of one pattern in one document contribute one document ID.
+
+The accepted dictionary stores eight prefix bytes, length and term ID in each
+fixed-size slot. Longer keys also require complete byte equality. Inline query
+records use the grammar's bounded term/operator counts. All structures are built
+from the supplied input during execution, with no external crate or cached answer.
+
+## Measured development steps
+
+These are separate whole-program comparisons against the baseline of each step;
+they must not be multiplied into a claimed combined speedup.
+
+| Change | Local full-input baseline → candidate | Baseline → candidate peak RSS | Official result after the change |
+|---|---:|---:|---:|
+| Six document shards and bounded summaries | 4.16 → 1.21 s | 369,928 → 437,364 KiB | 46.165807 points |
+| Streaming phrase automaton | 1.22 → 1.13 s | 437,568 → 185,296 KiB | 49.643708 points |
+| Active Boolean bitmap rows | 1.121360152 → 0.954795051 s | 185,356 → 61,684 KiB | 55.036276 points |
+| Compact dictionary and query records | 0.953204 → 0.813439 s | 61,620 → 57,340 KiB | 55.479075 points |
+
+The first two rows use medians of three interleaved native pairs. The last two
+use middle-three means from five paired pinned-image runs with the published
+child timer. Container startup is excluded from those image times. All comparisons used
+the same Intel Core i5-12500H/Ubuntu 24.04 WSL2 development machine. Sharded
+implementations used six workers; the first baseline was single-threaded. Input
+reading, construction, query evaluation and output are included.
+RSS is peak process RSS from native runs, not official cgroup memory.peak.
+
+The compact dictionary and query records had each missed their isolated adoption
+gates. Their separately registered combination passed the unchanged 1.15× speed,
+1.05 maximum RSS ratio and 1.06× coefficient-proxy gates. Its local source count
+was 401, compared with official S = 409. Local ratios remain estimates rather than
+predictions of the host score.
+
+## Correctness checks
+
+The accepted compact combination passed seven private tests and 18 additional
+case/seed groups. These cover prefix collisions and probe wraparound, missing
+terms, high term-ID bits, Boolean order and lengths, every byte-shard boundary,
+and bounded result summaries. Tiny seeds 100 and 101 passed before reserved 102.
+
+The wider validation record includes overlapping and suffix-related phrases,
+duplicate queries, unknown-token resets, empty documents, long documents crossing
+several ranges and ID sums exceeding 32 bits. Per-document predicates provide an
+independent oracle alongside the host reference. Published sample/full outputs
+matched exactly. The full seed-1 `results.txt` SHA-256 is:
+
+`f86973c210228141bcb6f1f1b10188ad2a9b65f71e7cd7cf4590b38de4e80927`
+
+Use the [repository checker](../README.md#build-and-check) with the corresponding
+official dataset and expected hash.
+
+## Rejected follow-ups
+
+A four-token interleaved lookup candidate preserved token order and exact key
+checks, but pinned-image time rose from 0.799053696 to 0.827242352 s. Its K proxy
+was 0.976494543. Both timing spreads and correctness checks passed; the efficiency
+gates failed, so the candidate was not submitted.
+
+A subsequent diagnostic measured query reuse and negative dictionary lookups
+without changing lookup results. Every Boolean query was checked over all truth
+assignments of its terms, and sample/full outputs matched their published hashes.
+
+| Diagnostic | Sample | Full | Predeclared candidate threshold |
+|---|---:|---:|---:|
+| Canonical prefix-operator reuse | 1.4906% | 1.6620% | At least 30% on both |
+| One-bit prefilter rejection, as a fraction of all lookups | 37.1451% | 19.2479% | At least 60% on both |
+
+The diagnostic passed its exactness checks, but neither candidate met its
+opportunity threshold. The filter only counted possible rejections; it never
+skipped the original lookup. These counters do not establish a runtime gain,
+and neither idea was implemented as a submission candidate.
+
+## Build-time PGO trial (October 31)
+
+A separate candidate kept the accepted Rust source byte-identical and changed
+only its build. The allowed LLVM-tools image collected a profile from one
+sample dataset generated inside the offline build, using the official generator
+and seed 130. The matching `llvm-profdata` merged 64 instrumented functions;
+the final runtime image contained only the optimized program on the usual
+Debian base. The candidate built in 16.06 seconds and occupied 30,058,994 bytes.
+
+The binaries extracted from both images produced the expected sample and full
+outputs. Eighteen correctness groups covered the host cases, independent
+per-document predicates and fresh seeds 131–133, with 133 reserved until the
+end. The fixed image batch measured 0.796115425 seconds for the accepted build
+and 0.801751279 seconds for PGO. Both timing spreads passed. Peak process RSS
+was 57,316 versus 57,576 KiB; these are local process measurements, not the
+scoring machine's cgroup peak.
+
+The speed ratio was 0.992971 and the K proxy was 0.992371. The source-size proxy
+included the extra Dockerfile instructions and excluded only the byte-identical
+official generator. This candidate missed the predeclared 1.15 speed and 1.06 K
+gates, so it was not submitted. The accepted build remains unchanged. This one
+profile provides no basis for claiming that PGO cannot help another workload.
+
+## Limits and record
+
+Each worker still visits the Boolean queries at every block. Phrase-match lists
+can grow with the number of matching documents. CPU profiles locate recurring
+dictionary and bitmap work, but do not establish cache-miss rates or wall-time
+shares. These constraints guide further measurement, not an assumed speedup.
+
+The [complete experiment log below](#complete-experiment-log) preserves the previous log unchanged, including
+all earlier failures, controls, timing repairs and fixed gates. Statements that a
+result was pending belong to their original observation time.
+
+Codex implemented the candidate and ran the checks.
+
+## Complete experiment log
+
+<details>
+<summary>Open the full chronological record, including rejected trials and measurement repairs</summary>
+
 # Track B: performance log
 
 ## Live-board history
@@ -659,3 +812,58 @@ ratio of 1.061158.
 The candidate passed the unchanged 1.15 speed, 1.05 maximum RSS ratio and 1.06
 efficiency gates. These are local measurements; an official score is pending.
 The previous isolated failures remain part of the record.
+
+
+## Official result: joint compact dictionary and queries (v26)
+
+Commit `72deb7d7d2abc47fa32758336a67fcacaa8c3b49` was pushed once at
+2026-10-31 07:58 UTC. Official run `run-a9ce34cd1404` finished at
+07:59:24 UTC with all five gates passing. Track B scored **55.479075**,
+up **0.442799** from the previous best of 55.036276. The board showed
+57.388 overall and rank 40 when read at 08:02:18 UTC. These are score
+observations, not an award or payment.
+
+The official measurements were T=0.918916 s, M=59,441,152 bytes, S=409,
+D=1, and K=12.870087. The measured source axis differs from the local
+401-line proxy; local ratios were not predictions of the official score.
+
+The fixed B >= 56.5 acceptance threshold was missed by 1.020925 points.
+This is a scientific threshold failure, not an upload or execution fault.
+The valid new best and its source are retained. A, C, and D source bytes
+were unchanged; their latest reruns did not replace their recorded bests.
+No unchanged retry, further retiming, parameter sweep, target relaxation,
+or documentation-only push is justified by this result.
+
+
+## Current-source profile and four-lane probe experiment (v27/v28)
+
+Two process-scoped CPU profiles of accepted source `b678b95a` contained
+844 and 848 accounted samples. The dictionary slot-load site held 144 and
+141 samples (17.06% and 16.63%). These locate CPU work; they do not measure
+cache misses, prove memory stalls, or give wall-time shares. Sample and full
+outputs matched their published hashes. The accepted source was unchanged.
+
+One fixed candidate gathered four tokens, loaded each unresolved probe
+position, and resolved the lanes with the existing exact key checks. It
+consumed results in token order so phrase boundaries and unknown-token
+resets stayed intact. Table size, hash, key representation, bitmap block
+size and worker count were unchanged. No batch-size sweep was run.
+
+Nine private tests and 18 additional case/seed groups passed, including
+reserved seed 105. The two warmup pairs and five measured image pairs used
+the same pinned images and child timer as the baseline. Both spread checks
+passed.
+
+| Local metric | Accepted v26 | Four-lane v28 |
+|---|---:|---:|
+| Image middle-three mean | 0.799053696 s | 0.827242352 s |
+| Native peak RSS | 57,280 KiB | 57,344 KiB |
+| Source-line proxy | 401 | 418 |
+
+Speedup was 0.965924549 and the source/RSS-adjusted K proxy was 0.976494543,
+below the fixed 1.15 and 1.06 gates. RSS ratio 1.001117318 passed its 1.05
+limit. The fixed four-lane candidate was rejected for efficiency. These
+measurements do not isolate the source of its overhead. The accepted v26
+source was restored; no official submission or unchanged retiming followed.
+
+</details>

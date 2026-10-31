@@ -1,7 +1,8 @@
 use std::collections::{HashMap, hash_map::DefaultHasher};
 use std::fs::{self, File};
 use std::hash::{Hash, Hasher};
-use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::io::{BufWriter, Write};
+use std::os::fd::AsRawFd;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -101,12 +102,6 @@ fn record_ends(bytes: &[u8], quoted: &mut bool, ends: &mut Vec<usize>) {
         return;
     }
     scalar_record_ends(bytes, quoted, ends, 0);
-}
-
-#[derive(Default)]
-struct Batch {
-    bytes: Vec<u8>,
-    ends: Vec<usize>,
 }
 
 type NameMap = HashMap<Vec<u8>, Vec<u64>>;
@@ -220,7 +215,7 @@ impl Partial {
         }
     }
 
-    fn consume(&mut self, batch: Batch, regions: &[u16], names: &SharedNames) {
+    fn consume(&mut self, bytes: &[u8], ends: &[usize], regions: &[u16], names: &SharedNames) {
         let mut begin = 0;
         let Self {
             groups,
@@ -234,8 +229,8 @@ impl Partial {
         for shard in requests.iter_mut() {
             shard.clear();
         }
-        for end in batch.ends {
-            let row = &batch.bytes[begin..end];
+        for &end in ends {
+            let row = &bytes[begin..end];
             begin = end;
             let row = row.strip_prefix(b"\xef\xbb\xbf").unwrap_or(row);
             let row = row.strip_suffix(b"\n").unwrap_or(row);
@@ -293,6 +288,149 @@ impl Partial {
     }
 }
 
+// The input mount is immutable for the lifetime of this read-only mapping.
+struct MappedInput {
+    pointer: *mut std::ffi::c_void,
+    length: usize,
+}
+unsafe extern "C" {
+    fn mmap(
+        address: *mut std::ffi::c_void,
+        length: usize,
+        protection: i32,
+        flags: i32,
+        fd: i32,
+        offset: i64,
+    ) -> *mut std::ffi::c_void;
+    fn munmap(address: *mut std::ffi::c_void, length: usize) -> i32;
+}
+impl MappedInput {
+    fn open(path: &Path) -> std::io::Result<Self> {
+        let file = File::open(path)?;
+        let length = usize::try_from(file.metadata()?.len()).unwrap();
+        if length == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "missing CSV header",
+            ));
+        }
+        // Linux PROT_READ and MAP_PRIVATE; no write is made through this mapping.
+        let pointer = unsafe { mmap(std::ptr::null_mut(), length, 1, 2, file.as_raw_fd(), 0) };
+        if pointer as isize == -1 {
+            return Err(std::io::Error::last_os_error());
+        }
+        Ok(Self { pointer, length })
+    }
+    fn bytes(&self) -> &[u8] {
+        // mmap succeeded for length bytes; this borrow cannot outlive self.
+        unsafe { std::slice::from_raw_parts(self.pointer.cast(), self.length) }
+    }
+}
+impl Drop for MappedInput {
+    fn drop(&mut self) {
+        unsafe {
+            munmap(self.pointer, self.length);
+        }
+    }
+}
+
+fn scalar_quote_parity(bytes: &[u8]) -> bool {
+    bytes.iter().fold(false, |odd, &byte| odd ^ (byte == b'"'))
+}
+
+#[cfg(target_arch = "x86_64")]
+#[target_feature(enable = "avx2")]
+unsafe fn vector_quote_parity(bytes: &[u8]) -> bool {
+    use std::arch::x86_64::*;
+    let mut offset = 0;
+    let mut mask_xor = 0u32;
+    while bytes.len() - offset >= 32 {
+        // Each load is in bounds. XOR preserves parity across all vector blocks.
+        let block = unsafe { _mm256_loadu_si256(bytes.as_ptr().add(offset).cast()) };
+        mask_xor ^=
+            _mm256_movemask_epi8(_mm256_cmpeq_epi8(block, _mm256_set1_epi8(b'"' as i8))) as u32;
+        offset += 32;
+    }
+    (mask_xor.count_ones() & 1 != 0) ^ scalar_quote_parity(&bytes[offset..])
+}
+
+fn quote_parity(bytes: &[u8]) -> bool {
+    #[cfg(target_arch = "x86_64")]
+    if std::is_x86_feature_detected!("avx2") {
+        // Runtime detection satisfies the target-feature precondition.
+        return unsafe { vector_quote_parity(bytes) };
+    }
+    scalar_quote_parity(bytes)
+}
+
+fn following_record_end(bytes: &[u8], start: usize, mut quoted: bool) -> usize {
+    let mut ends = Vec::new();
+    for (block, chunk) in bytes[start..].chunks(1 << 16).enumerate() {
+        ends.clear();
+        record_ends(chunk, &mut quoted, &mut ends);
+        if let Some(&end) = ends.first() {
+            return start + (block << 16) + end;
+        }
+    }
+    assert!(!quoted, "incomplete CSV record");
+    bytes.len()
+}
+
+fn partition_records(bytes: &[u8], workers: usize) -> Vec<usize> {
+    assert!(workers > 0);
+    let raw: Vec<usize> = (0..=workers).map(|i| bytes.len() * i / workers).collect();
+    let parity = std::thread::scope(|scope| {
+        let handles: Vec<_> = raw
+            .windows(2)
+            .map(|pair| {
+                let slice = &bytes[pair[0]..pair[1]];
+                scope.spawn(move || quote_parity(slice))
+            })
+            .collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    assert!(
+        !parity.iter().fold(false, |state, &odd| state ^ odd),
+        "incomplete CSV record"
+    );
+    let mut cuts = vec![0];
+    let mut quoted = false;
+    for i in 1..workers {
+        // Prefix parity gives the quote state at a raw cut, including inside an escape pair.
+        quoted ^= parity[i - 1];
+        cuts.push(following_record_end(bytes, raw[i], quoted));
+    }
+    cuts.push(bytes.len());
+    cuts
+}
+
+fn consume_range(bytes: &[u8], regions: &[u16], names: &SharedNames, countries: usize) -> Partial {
+    let mut partial = Partial::new(countries);
+    let mut quoted = false;
+    let mut ends = Vec::new();
+    let mut begin = 0;
+    for (block, chunk) in bytes.chunks(1 << 16).enumerate() {
+        ends.clear();
+        record_ends(chunk, &mut quoted, &mut ends);
+        if let Some(&last) = ends.last() {
+            let end = (block << 16) + last;
+            for offset in &mut ends {
+                *offset += (block << 16) - begin;
+            }
+            partial.consume(&bytes[begin..end], &ends, regions, names);
+            begin = end;
+        }
+    }
+    assert!(!quoted, "incomplete CSV record");
+    if begin < bytes.len() {
+        partial.consume(&bytes[begin..], &[bytes.len() - begin], regions, names);
+    }
+    partial
+}
+
 fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     let data = Path::new(args.get(1).map(String::as_str).unwrap_or("/data"));
@@ -318,80 +456,36 @@ fn main() -> std::io::Result<()> {
         regions[id] = group;
     }
     let names = SharedNames::new(keys.len());
-    let groups = std::thread::scope(|scope| -> std::io::Result<Vec<Group>> {
-        let workers = 6;
-        let mut senders = Vec::new();
+    let mapping = MappedInput::open(&data.join("records.csv"))?;
+    let bytes = mapping.bytes();
+    let header_end = bytes
+        .iter()
+        .position(|&b| b == b'\n')
+        .expect("CSV header terminator")
+        + 1;
+    let header = bytes[..header_end]
+        .strip_prefix(b"\xef\xbb\xbf")
+        .unwrap_or(&bytes[..header_end]);
+    let header = header.strip_suffix(b"\n").unwrap();
+    assert_eq!(
+        header.strip_suffix(b"\r").unwrap_or(header),
+        b"id,name,note,region_id,amount"
+    );
+    let bytes = &bytes[header_end..];
+    let cuts = partition_records(bytes, 6);
+    let groups = std::thread::scope(|scope| {
         let mut handles = Vec::new();
-        for _ in 0..workers {
-            let (sender, receiver) = std::sync::mpsc::sync_channel::<Batch>(1);
-            let regions = &regions;
-            let countries = keys.len();
-            let names = &names;
-            senders.push(sender);
-            handles.push(scope.spawn(move || {
-                let mut partial = Partial::new(countries);
-                for batch in receiver {
-                    partial.consume(batch, regions, names);
-                }
-                partial
-            }));
+        for pair in cuts.windows(2) {
+            let slice = &bytes[pair[0]..pair[1]];
+            let (regions, names, countries) = (&regions, &names, keys.len());
+            handles.push(scope.spawn(move || consume_range(slice, regions, names, countries)));
         }
-        let mut reader = BufReader::with_capacity(1 << 20, File::open(data.join("records.csv"))?);
-        let mut batch = Batch::default();
-        let mut quotes = false;
-        let mut header = true;
-        let mut worker = 0;
-        let mut chunk_ends = Vec::new();
-        loop {
-            let chunk = reader.fill_buf()?;
-            if chunk.is_empty() {
-                break;
-            }
-            chunk_ends.clear();
-            record_ends(chunk, &mut quotes, &mut chunk_ends);
-            let mut copied = 0;
-            for &end in &chunk_ends {
-                if header {
-                    batch.bytes.extend_from_slice(&chunk[copied..end]);
-                    copied = end;
-                    let row = batch
-                        .bytes
-                        .strip_prefix(b"\xef\xbb\xbf")
-                        .unwrap_or(&batch.bytes);
-                    let row = row.strip_suffix(b"\n").unwrap_or(row);
-                    let row = row.strip_suffix(b"\r").unwrap_or(row);
-                    assert_eq!(row, b"id,name,note,region_id,amount");
-                    header = false;
-                    batch.bytes.clear();
-                } else {
-                    let logical_end = batch.bytes.len() + end - copied;
-                    batch.ends.push(logical_end);
-                    if logical_end >= 1 << 16 {
-                        batch.bytes.extend_from_slice(&chunk[copied..end]);
-                        copied = end;
-                        senders[worker].send(std::mem::take(&mut batch)).unwrap();
-                        worker = (worker + 1) % workers;
-                    }
-                }
-            }
-            batch.bytes.extend_from_slice(&chunk[copied..]);
-            let consumed = chunk.len();
-            reader.consume(consumed);
-        }
-        assert!(!quotes && !header, "incomplete CSV record");
-        if !batch.bytes.is_empty() {
-            if batch.ends.last() != Some(&batch.bytes.len()) {
-                batch.ends.push(batch.bytes.len());
-            }
-            senders[worker].send(batch).unwrap();
-        }
-        drop(senders);
         let mut result = Partial::new(keys.len());
         for handle in handles {
             result.merge(handle.join().unwrap());
         }
-        Ok(result.groups)
-    })?;
+        result.groups
+    });
     let mut order: Vec<usize> = (0..keys.len()).collect();
     order.sort_unstable_by(|&a, &b| keys[a].cmp(&keys[b]));
     let mut writer = BufWriter::new(File::create(out.join("aggregates.txt"))?);

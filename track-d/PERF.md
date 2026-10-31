@@ -1,4 +1,228 @@
+# Track D: performance and validation
+
+Snapshot: 2026-10-31. The accepted source is the CSR/radix bidirectional solver,
+unchanged in repository commit `72deb7d7d2abc47fa32758336a67fcacaa8c3b49`.
+
+## Recorded official result
+
+The best recorded result was **50.424918 machine points**, from
+`run-396084b71fdb` on commit `0f25f4ae52026297711870aef38c85392ebe8dd5`,
+completed at 02:16:08 UTC.
+
+| Official axis | Value |
+|---|---:|
+| T: process time | 0.723518 s |
+| M: cgroup memory peak | 196,268,032 bytes |
+| S: source size | 289 |
+| D: dependency axis | 1 |
+| K: coefficient | 10.197609 |
+
+All five gates passed. This run accompanied a Track A change; D's source was
+unchanged. Its increase over 49.996742 is a same-source measurement, not another
+algorithmic gain. The best value was reconfirmed at 08:02 UTC. See
+[MEASUREMENTS.json](../MEASUREMENTS.json). These are live machine points, not final
+judging or an award.
+
+## Accepted design and exactness
+
+The [implementation notes](README.md) give the invariants in detail. The parser
+constructs forward and reverse CSR graphs with 32-bit destinations, weights,
+offsets and fill cursors. It releases the input byte buffer before CSR
+construction. Path arithmetic, radix-queue keys and output retain 64 bits.
+
+Each query alternates forward and reverse Dijkstra steps. A popped vertex and
+the opposite search's known distance supply an upper bound from a real directed
+path. The solver stops when the sum of the two valid queue minima cannot improve
+that bound; stale entries are removed first. It does not stop at the first meeting.
+Nonnegative weights permit a 65-bucket monotone radix queue in each direction.
+
+Distances below 4,294,967,294 fit inline in a `u32` array. Separate markers encode
+unvisited nodes and exact `u64` values in an overflow map. Only touched vertices
+are reset between queries. Up to six default workers process independent queries
+and return answers in input order. No graph or query-derived structure is shipped
+with the image; construction and searches are included in execution time.
+
+## Local comparisons that informed the accepted solver
+
+The following are separate full-input experiments against each step's then-current
+baseline. They include parsing, graph construction, all queries and output.
+
+| Change | Baseline → candidate median time | Baseline → candidate peak process RSS |
+|---|---:|---:|
+| Binary heap to radix heap | 1.14 → 0.95 s | 291,652 → 294,216 KiB |
+| Compact distances and earlier input release | 0.95 → 0.96 s | 294,296 → 212,556 KiB |
+| 32-bit CSR offsets and cursors | 0.98 → 0.92 s | 212,736 → 192,688 KiB |
+| Meeting checks at popped vertices | 0.93 → 0.84 s | 192,532 → 192,320 KiB |
+
+The radix comparison used three interleaved pairs; the others used five.
+Measurements ran with six workers on the same Intel Core i5-12500H/Ubuntu 24.04
+WSL2 machine. Native timing resolution was 0.01 s. Process RSS and simple
+source-line counts differ from official cgroup M and normalized S; each change
+passed its own recorded time/memory/source-size gate. These rows are not an
+ablation or a single end-to-end speed ratio.
+
+For example, removing per-neighbor meeting checks reduced the local full median
+by about 9.7%, but its first official run reduced T by about 1.4%. That run scored
+49.996742, improving the prior best while missing the registered 50.8 target.
+The local gain did not predict the official magnitude.
+
+## Correctness checks
+
+The popped-vertex version passed six property tests, including all 19,683 directed
+three-node graphs with absent, zero-weight or unit-weight edges, self-loops
+included. Every source/target pair was checked against independent Bellman–Ford.
+Seven host cases ran with one, two, six and twelve workers. Another 113 adversarial
+and random graphs used repeated and reversed all-pairs queries. Tiny seeds 37
+and 38 passed before reserved seed 39 was generated with the source frozen.
+
+The wider validation covers parallel arcs, directed reachability, zero-cost
+cycles, equal queue keys, stale entries, reset reuse and distances above 32 bits.
+Published sample/full hashes and the offline, read-only, unprivileged container
+check passed. Use the exact dataset hashes and output hash from the
+[official specification](https://github.com/hackathon-raptors/speed-demon-2026/blob/main/specs/d-traverse.md)
+with the [repository checker](../README.md#build-and-check).
+
+## Rejected alternatives
+
+A BFS vertex-numbering candidate was faster locally in three fixed build/timer
+contexts, but its official score was 49.524627, below the retained 50.424918 best.
+The source was restored. Matching the image build and child timer did not explain
+the reversal; the local machine and input still differed from the official run.
+
+Three later exact candidates were also rejected before submission:
+
+| Candidate | Paired image time, baseline → candidate | Measured outcome |
+|---|---:|---|
+| Query-protected degree-two corridor reduction | 0.847320 → 0.908317 s | RSS fell from 192,440 to 159,016 KiB; K proxy 0.948470 missed the fixed 1.27 gate. |
+| Predecessor-return guard | 0.863247 → 0.883230 s | A separate count showed 33.2% fewer neighbor-distance reads; K proxy 0.986398 missed 1.05. |
+| One-landmark feasible potential | 0.858436 → 4.503412 s | RSS rose from 192,224 to 318,784 KiB; K proxy 0.382963 missed 1.06. |
+
+Each row used a fixed five-pair pinned-image comparison and passed both timing
+spread checks. Correctness and published output hashes passed. The operation
+counts were collected separately from timing. In the potential trial, query
+expansions increased from 7,158,669 to 42,550,833, in addition to 3,480,732
+preprocessing expansions. Feasible reweighting preserved distances but increased
+the measured search work. These results reject the tested implementations, not
+all preprocessing or graph-reduction methods.
+
+## Fused graph construction — rejected local candidate, 2026-10-31
+
+This candidate counted forward and reverse degrees while parsing, then filled
+both CSR edge arrays in one shared pass over the stored edges. It removed three
+full scans of those triples. Node IDs, adjacency order, duplicates, weights,
+search logic and worker count were unchanged.
+
+| Fixed local comparison | Accepted baseline | Candidate |
+|---|---:|---:|
+| Image process time, mean of the middle three of five runs | 0.858853 s | 0.960344 s |
+| Peak native process RSS, maximum of five runs | 192,388 KiB | 185,220 KiB |
+| Nonblank, non-comment source lines | 281 | 286 |
+
+The image speed ratio was 0.894317, below the required 1.12. The RSS ratio of
+0.962742 passed the 1.03 limit, but the source-adjusted K proxy was 0.950375,
+below 1.05. Both timing spread checks passed. These local proxies use the pinned
+image and published child timer; process RSS and this source count are not the
+official cgroup-memory and source-size axes. Fewer triple scans did not improve
+time in this comparison; the measurements do not isolate the hardware cause.
+
+All seven Rust property tests passed, including ordered CSR rows and exhaustive
+three-node shortest paths. Seven host cases passed with one, two, six and twelve
+workers. Another 117 adversarial/random graphs matched Bellman–Ford; tiny seeds
+127 and 128 passed before reserved seed 129, with the source frozen throughout.
+Published sample/full hashes and all 14 image outputs matched. The candidate was
+not submitted. The accepted source and native binary were restored and the full
+output hash was checked again without retiming. This result rejects this fused
+implementation; it does not establish that further graph-construction work is
+unhelpful.
+
+## Limits and record
+
+Large-distance inputs can grow the overflow maps. CSR construction still holds
+parsed triples alongside its output arrays. Sampled distance-access locations
+identify work to investigate, but do not measure cache misses or prove that a
+proposed layout will improve time. Whole-program measurements remain necessary.
+
+The [complete experiment log below](#complete-experiment-log) preserves all previous entries unchanged,
+including the official BFS rejection, restoration, timing diagnostics and fixed
+gates. Its “current” and “pending” statements belong to their original snapshots.
+
+The implementation and validation were developed with Codex.
+
+## Complete experiment log
+
+<details>
+<summary>Open the full chronological record, including rejected trials and measurement repairs</summary>
+
 # Track D: performance log
+
+## One-landmark potential — rejected local candidate, 2026-10-31
+
+The candidate chose a maximum-outdegree vertex from the input and computed
+shortest distances from and to it. For each query it selected the stronger
+finite lower bound, reweighted the directed edges, ran the existing alternating
+bidirectional search and restored the original distance. Both preprocessing
+searches were included in the timed executable. There were no cached answers
+or extra dependencies.
+
+The reweighted edges remained nonnegative. Paths telescope by the difference
+between the endpoint potentials, and the finite-label restriction preserves
+every source-to-target path. Seven Rust tests passed, including exhaustive
+three-node graphs and checks of domain closure, edge feasibility and distance
+restoration. All seven host cases passed with 1, 2, 6 and 12 workers, as did
+117 adversarial/random all-pairs graphs and fresh seeds 118–120, with 120
+reserved. Published sample/full outputs matched, including all 14 image runs.
+
+The fixed five-pair image comparison rejected the candidate:
+
+| Measure | Accepted baseline | Candidate |
+|---|---:|---:|
+| Middle-three mean, whole process | 0.858436 s | 4.503412 s |
+| Maximum process RSS | 192,224 KiB | 318,784 KiB |
+| Nonblank source-line proxy | 281 | 343 |
+
+The speed ratio was 0.190619, the RSS ratio was 1.658399 and the K proxy was
+0.382963. Both timing spreads passed. The preregistered requirements were at
+least 1.20 for speed and 1.06 for K, with RSS no greater than 1.20 times baseline.
+These are local proxies, not official score or cgroup-memory measurements.
+
+A separate instrumented run counted 3,480,732 preprocessing expansions,
+42,550,833 query expansions and 127,426,723 query edge visits. The accepted
+solver's recorded counts were 7,158,669 query expansions and 21,075,641 edge
+visits. Query work increased in addition to the preprocessing work.
+With a forward landmark potential, a shortest-path-tree
+edge can acquire weight zero. The counters do not isolate how much of the
+extra work came from those zero-cost regions.
+
+The candidate was not submitted. The accepted source and native executable
+were restored; this result rejects the tested potential, not exact
+shortest-path preprocessing in general.
+
+## Predecessor-return guard — rejected local candidate, 2026-10-31
+
+This candidate carried the predecessor and vertex IDs in the queue's existing
+64-bit payload, keeping each queue item at 16 bytes. Before reading a neighbor's
+distance, it skipped an edge back to that predecessor. Nonnegative weights make
+this relaxation unable to improve the predecessor's label. Queue priorities,
+tie order, graph layout and forward/backward alternation stayed unchanged.
+
+A separate instrumented full run counted 21,075,641 adjacency visits and
+6,997,120 skipped predecessor returns: 33.2% of visits avoided that distance
+lookup. Its output matched the published hash. These are operation counts,
+not timing or cache-miss measurements.
+
+In the fixed five-pair comparison, the middle-three mean from the pinned images
+rose from 0.863247 to 0.883230 s. The speed ratio was 0.977375, maximum process
+RSS was 191,896 versus 192,024 KiB, and the source-adjusted K proxy was 0.986398.
+The required speed and K ratios were 1.12 and 1.05, with RSS no greater than
+1.03 times baseline. Both timing spreads passed; the efficiency gates failed.
+
+Eight private Rust tests passed, including exhaustive three-node graphs and
+stale, zero-weight and wide-distance paths. All seven host cases passed with
+1, 2, 6 and 12 workers, as did 117 adversarial/random all-pairs graphs and fresh
+seeds 115–117, with 117 reserved. Published sample/full outputs also matched.
+The candidate was not submitted. The accepted source and native executable
+were restored. Fewer distance reads did not improve whole-process time in this
+comparison; the measurements do not isolate the cause.
 
 ## Radix-queue candidate — local comparison, 2026-10-30
 
@@ -629,3 +853,111 @@ README were restored byte-for-byte from `0f25f4a`; this log retains the failed
 trial. A corrective push keeps the final recorded source on the previously
 accepted implementation. It is not another attempt to improve the score by
 rerunning unchanged code. These are live machine results, not an award or payment.
+
+
+## Timing-transfer diagnosis on frozen sources
+
+After rejecting the BFS version on the official board, a private diagnostic
+compared the accepted source with the exact rejected source. It changed neither
+implementation. Each of three fixed contexts used five interleaved full-data
+pairs, six query workers and the published full-input hashes. All 30 outputs
+matched; all six batches passed the published middle-three spread check.
+
+| Build and execution context | Accepted / rejected middle-three mean | Speedup |
+| --- | --- | --- |
+| Native build, native host | 0.827008 / 0.681656 s | 1.213233x |
+| Native build, container timer | 0.843116 / 0.686666 s | 1.227840x |
+| Pinned submission-image build, container timer | 0.851646 / 0.722644 s | 1.178514x |
+
+Native Rust was 1.99.0; the pinned image used 1.99.1. Both reported LLVM 23.1.1.
+The container measurements used the unmodified published timer, CPUs 0–11 and
+the published middle-three mean. Container startup was excluded. The native
+measurements used the earlier blocking parent timer.
+
+The BFS version remained faster locally in all three contexts. These factors
+therefore did not explain the official reversal. Victus WSL is not the official
+physical scoring box, and this diagnostic did not measure canonical cgroup
+memory peaks. Its writable timing directory also does not reproduce the
+host's tamper-isolation setup. No official submission or source adoption followed
+from this diagnostic; the earlier official failure remains the decision record.
+
+
+## Neighbor-distance prefetch trial
+
+A local candidate issued one T0 prefetch hint for each neighbor's compact
+distance slot before the existing relaxation loop. It kept the queue, graph
+layout, six query workers and exact distance reads unchanged. The first build
+failed at the intrinsic's target-feature call boundary, before any workload ran.
+An explicit unsafe block around the guarded call fixed that build error; the
+algorithm and acceptance criteria were unchanged.
+
+The repaired candidate passed seven private Rust tests, including exhaustive
+three-vertex graphs, plus 117 adversarial and random all-pairs cases. Published
+sample and full outputs matched. Tiny seeds 61, 62 and the reserved seed 63 also
+matched the reference and independent Bellman-Ford oracle with 1, 2, 6 and
+12 workers.
+
+In the fixed five-pair comparison using the pinned submission images and
+published child timer, the middle-three means were 0.871139 s for the accepted
+source and 0.890487 s for the candidate: a speed ratio of 0.978272. Both spread
+checks passed. Native peak RSS was 192,428 versus 192,320 KiB. The local
+efficiency proxy was 0.983002 after the source-line factor. This missed the
+required 1.12 speed ratio and 1.05 efficiency ratio.
+
+The candidate was rejected and the accepted source restored. No official
+submission followed. These Victus measurements use native RSS and a line-count
+proxy; they are not official machine scores or canonical cgroup memory peaks.
+
+
+## Query-protected degree-two census
+
+A private topology diagnostic on 2026-10-31 counted original-degree-two
+vertices as candidates for exact corridor reduction. Every query endpoint
+was protected. Self-loops were ignored when counting distinct undirected
+neighbors; vertices with a non-self incident weight above floor(u32::MAX / n)
+were excluded to keep a possible simple corridor sum within u32.
+
+The published full input contained 441,141 degree-two vertices. Of these,
+979 were query endpoints and 123 failed the weight bound, leaving 440,039
+eligible vertices out of 1,740,512: 25.2822%. Eight small fixtures matched an
+independent set-based oracle, including directed chains, parallel edges,
+self-loops, a zero-weight cycle and wide weights. The full-input hashes,
+degree partition and incident-edge totals also matched.
+
+The eligible fraction narrowly cleared the fixed 25% screening threshold.
+This supports assessing a bounded implementation; it does not measure the
+size of a contracted graph, runtime, memory savings or a score gain. A solver
+trial would need separate registration, exact shortest-path checks and an
+end-to-end cost gate that includes preprocessing. No solution source was
+changed and no official submission followed from this diagnostic.
+
+
+## Exact corridor-reduction trial
+
+A runtime prototype removed eligible original-degree-two vertices while
+protecting every query endpoint. It preserved directed edges and used the
+minimum parallel-edge weight along each corridor. It compacted the forward
+CSR in place, released temporary data and rebuilt the reverse graph before
+running the accepted bidirectional search. Preprocessing remained inside
+every whole-process measurement.
+
+All 11 private Rust tests passed. These included contraction with individual
+endpoint pairs across all 729 three-node graph variants, shuffled chains,
+directed dead ends, zero-weight cycles, parallel edges and wide distances.
+The seven host cases passed with 1, 2, 6 and 12 workers. Another 117 adversarial
+and random all-pairs graphs, fresh tiny seeds 106 and 107, reserved seed 108,
+and the published sample and full hashes also matched.
+
+The fixed five-pair submitted-image comparison gave middle-three means of
+0.847320 s for the accepted source and 0.908317 s for the candidate, a speed
+ratio of 0.932846. Both spread checks passed. Native peak RSS fell from
+192,440 to 159,016 KiB, but the efficiency proxy was 0.948470 after the
+source-line factor. The fixed gate required a 1.45 speed ratio, no RSS
+increase and an efficiency ratio of at least 1.27.
+
+The candidate missed the cost gate and was rejected. Accepted source and
+the native build were restored; no official submission followed. These
+measurements do not isolate preprocessing cost, and the RSS and line counts
+are proxies rather than official memory or source-count measurements.
+
+</details>

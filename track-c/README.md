@@ -5,12 +5,17 @@ An exact CSV parser, region join and country aggregator for the
 
 ## Approach
 
-The reader scans buffered input blocks for quotes and newlines. On x86-64 CPUs
-with AVX2, 32-byte masks and prefix XOR identify newlines outside quoted fields;
-other CPUs and short tails use a scalar scanner. Quote parity carries across
-blocks. Escaped quote pairs do not change it, and quoted newlines remain inside
-their records. Logical-record batches target 64 KiB, with oversized records
-kept intact, and pass through bounded queues to six parsing workers.
+The input is memory-mapped read-only. Six byte chunks first count quote parity
+in parallel. On x86-64 CPUs with AVX2, each worker XORs 32-byte quote masks and
+reduces the result to one bit; other CPUs and short tails use scalar code.
+Prefix XOR gives the quote state at each of the five interior chunk boundaries.
+A forward scan then moves each cut to the next complete record. Escaped quote
+pairs, quoted newlines and records spanning several chunks retain their meaning.
+
+Six parsing workers borrow the resulting disjoint ranges from the mapping.
+Within each range, quote-aware scanning forms batches targeting 64 KiB, with
+oversized records kept intact. No input buffers or producer queues are needed.
+The mapping stays alive until every worker has finished.
 
 The parser removes one BOM only at a record boundary, then unescapes name bytes
 and counts decoded note bytes without storing the notes. It preserves empty
@@ -24,8 +29,8 @@ and locks each nonempty shard once. The first `(name, country)` pair sets a bit
 and increments that worker's distinct count while holding the lock. Summing the
 worker counts therefore preserves global distinctness across batches.
 
-For tables with at most 256 countries, names of up to 16 bytes use inline
-entries: two words hold the complete name, a separate length distinguishes
+For tables with at most 256 country groups, including `_UNMATCHED`, names of
+up to 16 bytes use inline entries: two words hold the complete name, a separate length distinguishes
 zero-padded values, and four words hold the country bits. These requests carry
 their keys directly, without copying them into the decoded-name arena. Longer
 names and tables with more countries retain the full-byte map and variable-size
@@ -53,14 +58,15 @@ the container runs the Rust binary.
 
 ## Dependencies
 
-Rust standard library only; no CSV crate, dataframe or SQL engine.
+Rust standard library and the Linux `mmap`/`munmap` interfaces; no external
+crates, CSV library, dataframe or SQL engine. The native binary targets Linux.
 Codex developed the implementation and validation. [PERF.md](PERF.md) records
 the measurements and their limits.
 
 ## With another 24 hours
 
-Measure the producer/worker balance after inline membership, including inputs
-that use the long-name or large-country-table fallback. Retained buffers and
-inline table slots have different memory costs. Further changes should follow
-measurements of the current source; the existing phase measurements and
-rejected variants are preserved in PERF.md.
+Measure the current quote-parity scan, range parsing and shared-membership
+costs separately, including long-name and large-country-table inputs. The
+mapping trial with sequential boundary discovery and the earlier pipeline
+profiles remain in PERF.md; their overlapping intervals cannot predict the
+savings from this implementation.

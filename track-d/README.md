@@ -80,3 +80,12 @@ The overflow maps can grow on inputs with many large distances. Inline storage
 adds branches to distance access, and graph construction still needs parsed
 triples alongside CSR storage. The performance log measures the combined
 working-set change; it does not isolate either part's contribution.
+
+## With another 24 hours
+
+Use the recorded graph and query-work counts to assess a distinct exact
+preprocessing method before implementing it. Its query savings must repay its
+construction time and memory in the whole-program measurement. The corridor and
+one-landmark trials did not do so; lower operation counts alone also failed to
+predict the predecessor guard's runtime. Keep the accepted directed-search
+invariants and independent Bellman–Ford checks for any new candidate.

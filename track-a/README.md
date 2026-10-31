@@ -67,3 +67,13 @@ writes remain serial. Output buffering is bounded by the workers' current hour
 buffers and the buffer being written. Each group is emitted once; exact
 latency values and duplicate counts are retained until its percentiles and row
 have been produced.
+
+
+## With another 24 hours
+
+Measure the serial merge's contribution and the distribution of latency-vector
+capacity across endpoint/hour groups. A useful next candidate would reduce that
+merge work while preserving every latency value and duplicate. Endpoint storage
+layouts already missed their fixed efficiency gates; they are not an untested
+shortcut. Any new mechanism needs a separate whole-program comparison and exact
+output checks before adoption.

@@ -1,3 +1,114 @@
+# Track A: performance and validation
+
+Snapshot: 2026-10-31. This report describes the accepted source in repository
+commit `72deb7d7d2abc47fa32758336a67fcacaa8c3b49`.
+
+## Recorded official result
+
+The best recorded live-board result was **61.431366 machine points**, from
+`run-8ed375c52049` on commit `a19af6b27d282acc02b43cc963b83825081beadf`,
+completed at 2026-10-31 03:13:53 UTC.
+
+| Official axis | Value |
+|---|---:|
+| T: process time | 0.130583 s |
+| M: cgroup memory peak | 49,778,688 bytes |
+| S: source size | 254 |
+| D: dependency axis | 1 |
+| K: coefficient | 16.928845 |
+
+All five board gates passed. This run accompanied a Track D restoration; A's
+source had not changed. The earlier run that introduced the accepted A algorithm,
+`run-5bc4a01a8486`, scored 57.856284. The later same-source increase is a recorded
+measurement, not evidence of another algorithmic improvement. The best value was
+reconfirmed at 08:02 UTC. Own-track observations and run IDs are in
+[MEASUREMENTS.json](../MEASUREMENTS.json); these are practice scores, not final
+judging or an award.
+
+## What the implementation retains
+
+The [implementation notes](README.md) explain the exactness arguments. The main
+choices are disjoint byte-range readers, lazy endpoint/hour groups and exact
+latency sorting. Endpoint scanning also computes a fingerprint; a fingerprint
+match is always checked against the complete endpoint bytes. Hash collisions
+therefore cannot combine different groups.
+
+Output workers own contiguous blocks of sorted endpoints. Each formats one hour
+at a time and sends its buffer through a zero-capacity channel. The writer receives
+in hour-major, endpoint-block order. Completed latency vectors are released, while
+all duplicate values remain available until their group's percentiles are computed.
+Reading and formatting are parallel; merging and final ordered writes are serial.
+
+## Local evidence for the accepted combination
+
+Fused endpoint interning and bounded output each missed their standalone adoption
+gates. A separately registered experiment tested their combination against the
+then-accepted implementation; their individual speed ratios were not combined to
+predict a result.
+
+Five interleaved full-input pairs measured median command times of **0.167603 s**
+and **0.125564 s**, a **1.334806×** ratio. Maximum process RSS was 39,972 and
+39,912 KiB. The time/RSS/source-line coefficient proxy was 1.120126. All fixed
+adoption gates passed. These measurements used an otherwise idle Intel Core
+i5-12500H running Ubuntu 24.04 under WSL2, with six workers and Rust release
+optimization. Each process read the input, aggregated it and wrote the full output.
+
+The local source-line proxy was 218; the official S was 254. Process RSS is also
+different from the board's cgroup memory peak. Neither proxy predicts the official
+coefficient exactly. The first official result improved the previous best by
+0.418766 points but missed the registered 58.5-point target. The valid improvement
+was retained and the target miss was recorded.
+
+## Correctness checks
+
+The accepted combination passed 53 existing checks and four additional property
+tests, including forced fingerprint collisions, endpoint boundaries, output ordering
+and cancellation after a write error. Fresh tiny seeds 34 and 35 passed before
+reserved seed 36 was generated. Shard-boundary fixtures check that each complete
+line is assigned once, including long lines and exact boundary starts.
+
+Published sample/full outputs matched exactly, including a full run in the
+offline-built, unprivileged container with a read-only root and no network.
+The expected full seed-1 `summary.txt` SHA-256 is:
+
+`495ca09682b9673ef836a506496177680bb4a3af54255174befddb1f83481cd3`
+
+Build and reproduction commands are in the [repository README](../README.md#build-and-check).
+
+## Later trials and remaining limits
+
+Two endpoint-storage trials were correct but did not meet their fixed 1.15× speed
+and 1.06× coefficient-proxy requirements. Each used five paired pinned-image runs;
+the table reports middle-three mean process times, excluding container startup.
+
+| Candidate | Baseline → candidate | Speed ratio | K proxy |
+|---|---:|---:|---:|
+| Inline head IDs and dense collision links | 0.126725 → 0.121404 s | 1.043829 | 1.019183 |
+| Inline endpoint bytes | 0.128257 → 0.133270 s | 0.962387 | 0.974872 |
+
+Both passed their RSS limits. Neither was submitted; the accepted source was
+restored. The measurements do not isolate allocation or cache effects.
+
+Two current-source profiles placed endpoint comparison, fingerprint lookup,
+hour lookup and latency insertion among the recurring CPU sample locations.
+These are sampling observations, not wall-time fractions or measured memory stalls.
+Group capacity, serial merging and ordered writes remain limits to investigate;
+no further gain is assumed from those observations.
+
+## Record and assistance
+
+The [complete experiment log below](#complete-experiment-log) preserves the earlier performance log unchanged,
+including rejected candidates, same-source reruns, timing repairs and thresholds.
+Its references to a “current” or “pending” result describe the state when that
+entry was written. This report identifies the accepted snapshot above.
+
+Codex implemented and validated the changes.
+
+## Complete experiment log
+
+<details>
+<summary>Open the full chronological record, including rejected trials and measurement repairs</summary>
+
 # Track A: performance log
 
 ## Parallel byte-range candidate — local comparison, 2026-10-30
@@ -425,3 +536,69 @@ process RSS was 39,972 and 39,912 KiB. The source-size-aware proxy was
 1.120126. All three fixed gates passed. The proxy uses nonblank source lines
 and is not the official scorer's SCC count. These are local results; no
 official points are inferred. Codex implemented and validated the changes.
+
+
+## Official cross-stage result, 2026-10-31
+
+Commit `0f25f4a` was submitted once. Official run `run-5bc4a01a8486`
+passed all five gates: T = 0.181018 s, M = 50,114,560 bytes, S = 254,
+D = 1 and K = 14.359049. Its 57.856284 machine points became the new
+Track A best, 0.418766 above 57.437518. The registered 58.5 target was
+missed by 0.643716; this was a threshold miss, not a failed execution.
+
+The official source count was 254; the local nonblank-line proxy was 218.
+Local timing and source counts therefore did not predict the official gain
+exactly. The valid improved source is retained. No unchanged retry was made.
+At 02:16:29 UTC, the overall display was 52.515, rank 37. D also recorded
+a new best on unchanged source, so that change is not attributed to this
+Track A algorithm. The board is practice scoring, not an award or payment.
+
+
+## Current-source CPU attribution
+
+A private debug build of the accepted fused-interning and rendezvous-output
+source was sampled twice on 2026-10-31. Each profile covered five full-input
+executions with six workers. The sample control, full control and all ten
+profiled outputs matched their published hashes. Production source stayed
+unchanged.
+
+The two profiles captured 1,171 and 1,162 process CPU samples. Both placed
+the same four source sites among their top five: endpoint byte comparison
+(109 and 104 samples), fingerprint-table entry lookup (58 and 51), hour lookup
+(69 and 63), and latency insertion (42 and 36). Addresses were resolved through
+the exact ELF executable segments and its debug information.
+
+These are exclusive CPU sample locations, including wrapper and runtime
+overhead, not wall-time shares or proof of memory stalls. Lost samples were
+not measured. The result supports investigating the current dictionary
+representation; it does not establish a speedup or an official score gain.
+
+## Endpoint storage experiments, 2026-10-31
+
+Two separately registered candidates changed the endpoint dictionary. The first
+stored the fingerprint's head ID in the hash table and collision links in a dense
+array. The second also stored each endpoint's bytes inline in a contiguous record,
+using the specification's 125-byte maximum. Both retained full-byte equality on
+hash collisions and left parsing, grouping, quantiles and output scheduling unchanged.
+
+Each candidate had its own fixed five-pair comparison against the accepted source,
+using pinned images built from the submission Dockerfile and the published child timer on Victus.
+The table reports the mean of the middle three times from each set of five.
+
+| Candidate | Baseline time | Candidate time | Speed ratio | Peak process RSS, baseline → candidate | K proxy |
+|---|---:|---:|---:|---:|---:|
+| Inline head IDs | 0.126725 s | 0.121404 s | 1.043829 | 39,896 → 39,840 KiB | 1.019183 |
+| Inline endpoint bytes | 0.128257 s | 0.133270 s | 0.962387 | 39,912 → 39,180 KiB | 0.974872 |
+
+The fixed gates required at least 1.15× speed and 1.06× K proxy, with a process-RSS
+ratio no greater than 1.05. Both missed the efficiency gates. All 53 recorded check
+groups passed in each run; the private Rust suites contained seven and eight tests respectively.
+Fresh seeds 109–111 and 112–114 included a reserved final seed in each experiment.
+Long forced-collision chains, all valid endpoint lengths, shard boundaries and
+published output hashes were checked.
+
+Neither candidate was submitted. The accepted source and native executable were
+restored. These whole-process measurements do not isolate cache or allocation costs;
+the RSS and source-line inputs to K remain local proxies, not official scoring data.
+
+</details>

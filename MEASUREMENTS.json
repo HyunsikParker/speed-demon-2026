@@ -1,0 +1,92 @@
+{
+  "kind": "historical_official_live_board_observation_not_final_judging",
+  "best_values_reconfirmed_at": "2026-10-31T08:02:18.806Z",
+  "source": "https://speeddemon.dev/board/",
+  "source_commit_snapshot": "72deb7d7d2abc47fa32758336a67fcacaa8c3b49",
+  "tracks": {
+    "a": {
+      "run_id": "run-8ed375c52049",
+      "commit": "a19af6b27d282acc02b43cc963b83825081beadf",
+      "ended_at": "2026-10-31T03:13:53Z",
+      "T_s": 0.130583,
+      "M_bytes": 49778688,
+      "S": 254,
+      "D": 1,
+      "K": 16.928845,
+      "machine_points": 61.431366,
+      "same_source_control": true,
+      "gates": {
+        "check": true,
+        "build": true,
+        "correctness": true,
+        "timeout": true,
+        "sandbox": true
+      },
+      "accepted_source_sha256": "3531747bc84e38a9d7522a60939417b4390ee660fd784e781d717f4521ecd5ab"
+    },
+    "b": {
+      "run_id": "run-a9ce34cd1404",
+      "commit": "72deb7d7d2abc47fa32758336a67fcacaa8c3b49",
+      "ended_at": "2026-10-31T07:59:24Z",
+      "T_s": 0.918916,
+      "M_bytes": 59441152,
+      "S": 409,
+      "D": 1,
+      "K": 12.870087,
+      "machine_points": 55.479075,
+      "same_source_control": false,
+      "gates": {
+        "check": true,
+        "build": true,
+        "correctness": true,
+        "timeout": true,
+        "sandbox": true
+      },
+      "accepted_source_sha256": "b678b95afb3e1d3de11a081c6b54cd1e06b20edb57181e9c526d1fa0d6b9fcc9"
+    },
+    "c": {
+      "run_id": "run-52f0819fc621",
+      "commit": "1c06a7cd760f25d771fb196b6e111e9b74d2666c",
+      "ended_at": "2026-10-31T05:55:45Z",
+      "T_s": 0.187834,
+      "M_bytes": 20283392,
+      "S": 401,
+      "D": 1,
+      "K": 12.856051,
+      "machine_points": 55.45538,
+      "same_source_control": false,
+      "gates": {
+        "check": true,
+        "build": true,
+        "correctness": true,
+        "timeout": true,
+        "sandbox": true
+      },
+      "accepted_source_sha256": "edab533545e0be10fca888b2919a8d7e15b63556fc0df1b07776b10cc8fb9904"
+    },
+    "d": {
+      "run_id": "run-396084b71fdb",
+      "commit": "0f25f4ae52026297711870aef38c85392ebe8dd5",
+      "ended_at": "2026-10-31T02:16:08Z",
+      "T_s": 0.723518,
+      "M_bytes": 196268032,
+      "S": 289,
+      "D": 1,
+      "K": 10.197609,
+      "machine_points": 50.424918,
+      "same_source_control": true,
+      "gates": {
+        "check": true,
+        "build": true,
+        "correctness": true,
+        "timeout": true,
+        "sandbox": true
+      },
+      "accepted_source_sha256": "cdc17e0443c12352906c5fc829a8985081f645031cb21e7642b21e1c885a0e95"
+    }
+  },
+  "limitations": [
+    "A and D best runs accompanied another track change; their score variation is not attributed to a new algorithm.",
+    "No final judge score, award or payout is asserted."
+  ]
+}
