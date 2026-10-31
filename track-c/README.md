@@ -5,27 +5,35 @@ An exact CSV parser, region join and country aggregator for the
 
 ## Approach
 
-The reader appends physical lines to a reusable record buffer until quote parity
-is even. Escaped quote pairs contribute two quotes, so they do not change that
-parity. A newline inside a quoted field stays in the record. The parser removes
-one BOM only at a record boundary, then unescapes name bytes and counts decoded
-note bytes. It preserves empty values, trailing spaces, embedded newlines and
-literal BOM bytes inside text. Notes are counted without storing their contents.
+The reader scans buffered input blocks for quotes and newlines. On x86-64 CPUs
+with AVX2, 32-byte masks and prefix XOR identify newlines outside quoted fields;
+other CPUs and short tails use a scalar scanner. Quote parity carries across
+blocks. Escaped quote pairs do not change it, and quoted newlines remain inside
+their records. Logical-record batches target 64 KiB, with oversized records
+kept intact, and pass through bounded queues to six parsing workers.
+
+The parser removes one BOM only at a record boundary, then unescapes name bytes
+and counts decoded note bytes without storing the notes. It preserves empty
+values, trailing spaces, embedded newlines and literal BOM bytes inside text.
 
 The region table maps integer IDs directly to compact country IDs. Missing IDs,
-including holes within the table's range, map to `_UNMATCHED`. Names are interned
-globally as exact byte strings. Each country keeps a dynamically growing bitset
-of those IDs and a distinct-name counter. A name first seen in that country
-sets one bit and increments the counter; repeats leave it unchanged. This
-avoids a second hash lookup and another copy of the name. The bitset grows from
-the IDs actually observed; it does not assume a fixed name-pool size.
-No input-derived table is shipped: these structures are built from the input on
-each run.
+including holes within the table's range, map to `_UNMATCHED`. A shared map,
+partitioned across 64 mutex-protected shards, stores exact name bytes and their
+country-membership bitsets. Each worker groups a batch's name requests by shard
+and locks each nonempty shard once. The first `(name, country)` pair sets a bit
+and increments that worker's distinct count while holding the lock. Summing the
+worker counts therefore preserves global distinctness across batches.
+
+Workers retain their name buffers, decoded-name arenas and request-vector
+capacities between batches, clearing their lengths before reuse. Numeric
+aggregates remain worker-local until the final merge. All lookup structures are
+built from the current input; no input-derived table or precomputed answer is
+shipped.
 
 Counts and ID totals use 64-bit integers. Money is parsed and aggregated as
 signed 64-bit cents, including values between -1.00 and 0.00. Output contains only
 countries with records, sorted by their byte keys, with exact two-digit money
-formatting. The implementation uses one thread.
+formatting.
 
 ## Build and run
 
@@ -44,7 +52,8 @@ the measurements and their limits.
 
 ## With another 24 hours
 
-Profile CSV decoding and the global name interner separately. The country
-bitsets reserve space up to their highest observed global name ID, even when
-a country contains few distinct names. A sparse representation is worth
-comparing on inputs with many global names and sparse country membership.
+Measure producer framing, worker parsing and shared membership separately on
+the current version. The scratch-lifetime change reduced repeated buffer
+construction, but retained high-water capacities can cost memory. A follow-up
+should identify the remaining bottleneck before changing the batch, worker or
+shard counts. The measurements and rejected variants are preserved in PERF.md.

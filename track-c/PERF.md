@@ -232,3 +232,177 @@ Commit `2f5cdaf` changed D; this track's source was unchanged. Run
 machine points. The board retained the earlier best 39.615362.
 At 23:07:03 UTC on 2026-10-30, the overall display was 52.170, rank 34.
 This rerun does not establish a new algorithm improvement, final judging or an award.
+
+## Same-source observation with the popped-vertex meeting push
+
+Commit `b94f7ff` changed D; this track's source was unchanged. Run
+`run-7e5e1cff1ef3` passed all five gates and recorded 38.945851
+machine points. The board retained the earlier best 39.615362.
+At 23:53:09 UTC on 2026-10-30, the overall display was 52.240, rank 35.
+This rerun does not establish a new algorithm improvement, final judging or an award.
+
+
+## Rejected local experiment: bounded parallel parsing
+
+On 2026-10-31, a six-worker candidate consumed CSV batches targeting 1 MiB
+and ending only at logical record boundaries. Oversized records stayed intact.
+Each worker kept exact decoded-name/country sets; the final merge took their
+union before counting distinct names. All 14 correctness
+checks passed, including a record larger than a batch, cross-worker duplicates,
+BOMs, an unterminated final line, seeds 25/26 and the frozen seed-27 holdout.
+The published sample/full hashes and the offline, unprivileged container passed.
+
+Five interleaved full-size pairs measured median wall time of 0.71 s for the
+accepted serial version and 0.37 s for the candidate. Maximum process RSS rose
+from 18,548 to 118,620 KiB. The local coefficient-ratio proxy was
+0.906063, below the fixed 1.60 gate. It uses GNU time process RSS and
+nonblank, noncomment source lines, not the official cgroup memory or scc count.
+A roughly 1.59 coefficient gain would be needed just to reach the lowest of
+the current best three track scores. No official score improvement is claimed.
+
+The candidate was not pushed, and the accepted serial source was restored.
+The first validation attempt stopped at Python's default CSV field-size limit
+in the added 2 MiB-field test. Raising that test-process limit left the candidate
+and reference algorithm unchanged; the rerun then completed. Both attempts
+are recorded separately.
+
+## Shared membership and batched locking — 2026-10-31
+
+A capacity diagnostic of the rejected six-map version found 598,023 name
+entries across workers for 100,520 globally distinct names. The tracked peak
+capacity of sent, blocked and consuming batches was 23,625,728 bytes. These
+counts describe duplicated storage and buffer capacity; worker snapshots were
+taken at different times, and the buffer counter excludes the unfinished
+producer buffer and allocator overhead.
+
+The next candidate, v7, kept one exact name-to-country-bitset map behind 64
+locks. Each first `(name, country)` pair incremented one worker's counter
+while holding its shard lock. Six parsing workers consumed logical-record
+batches targeting 64 KiB; oversized records remained intact. This removed the
+per-worker name maps and their final union merge.
+
+Two process-scoped `task-clock:u` profiles at 999 Hz collected 1,225 and 1,285
+CPU samples. Exact-binary source resolution attributed 39.27% and 36.96% to
+membership updates. Across all samples, mutex leaf functions accounted for
+14.37% and 14.16%; their attribution is not wholly nested under membership.
+Another 226 and 266 samples remained unresolved or belonged to other DSOs.
+These are CPU sample locations, not wall-time shares or measured speedup
+opportunities. The first offline decoding attempt exceeded its 10-second
+limit; decoding the same saved samples completed with a 60-second limit.
+The workload was not rerun for that repair.
+
+Candidate v9 grouped each batch's decoded-name requests by the same 64 shards,
+then acquired each nonempty shard once. It retained six workers, 64 KiB
+batches and full-byte name equality. Batch arenas added temporary copies.
+
+Each candidate passed the existing CSV oracles, concurrent duplicate-count
+checks, published sample/full hashes and three new tiny seeds. V9 also checked
+duplicates within and across concurrent batches on one forced shard. The
+reserved seeds were 30 for v7 and 33 for v9, with source frozen before each.
+
+| Candidate | Accepted image time (s) | Candidate image time (s) | Accepted / candidate peak RSS (KiB) | Source-line proxy | K-ratio proxy |
+|---|---:|---:|---:|---:|---:|
+| Shared map, v7 | 0.718178 | 0.258539 | 18,540 / 24,432 | 173 / 268 | 1.476964 |
+| Batched locks, v9 | 0.712441 | 0.254487 | 18,548 / 24,976 | 173 / 290 | 1.458962 |
+
+Each row used five interleaved pairs on Victus WSL. Image times are the mean of
+the middle three runs recorded by the published child timer; both spread
+checks passed. RSS is the maximum from five native runs, and source size counts
+nonblank, noncomment lines. The proxy combines these local measurements; it
+is not the official cgroup-memory/scc coefficient or a board score. The two
+candidates ran in separate batches, so their small timing difference does not
+establish that batching improved on v7.
+
+Both missed the fixed 1.65 K-ratio gate and were kept out of the submission.
+The accepted serial source was restored. A further change needs evidence about
+producer framing, channel blocking and worker processing on the critical path;
+CPU sample percentages alone do not identify it.
+
+## Pipeline phases and block framing — 2026-10-31
+
+Batch-boundary timers in private builds compared the v7 and v9 pipelines.
+Across two full-data v9 runs, median worker processing occupied 133.5–134.9 ms,
+while the producer took 218.6–235.6 ms. Workers spent a median 85.4–100.1 ms
+inside receive calls. Producer time outside send calls was 184.9–200.3 ms.
+For v7, median worker processing was 209.9–221.1 ms and the producer took
+245.3–248.1 ms. All eight sample, control and instrumented runs matched the
+published output hashes.
+
+Worker intervals overlap. Send and receive calls include channel overhead,
+scheduling and waiting; producer time outside sends includes reading, framing,
+copying and bookkeeping. The counters therefore support investigating the
+producer, but do not isolate I/O cost or prove a causal wall-time saving.
+
+Candidate v11 scanned each buffered input block for quotes and newlines.
+On AVX2-capable x86-64 CPUs, 32-byte masks and prefix XOR tracked quote parity
+across vectors and input blocks. Other CPUs and the final short tail used the
+scalar scanner. Copies into the existing 64 KiB logical-record batches occurred
+at dispatch or input-block boundaries. The six workers and v9 membership
+updates stayed unchanged.
+
+The vector load is bounded by the remaining slice length and guarded by
+runtime feature detection. Its unaligned-load and feature-detection contracts
+are documented in Rust's [_mm256_loadu_si256](https://doc.rust-lang.org/core/arch/x86_64/fn._mm256_loadu_si256.html)
+and [is_x86_feature_detected!](https://doc.rust-lang.org/std/macro.is_x86_feature_detected.html)
+references. Private tests compared vector/scalar boundaries across quote states,
+byte values, short tails and split positions. All four Rust tests, the existing
+CSV/concurrency oracles, tiny seeds 34/35 followed by reserved 36, and the
+published sample/full hashes passed.
+
+Five interleaved pinned-image pairs measured 0.720779 s for the accepted serial
+version and 0.192418 s for v11, using middle-three means; both spread checks
+passed. The speed ratio was 3.745895. Maximum native process RSS was 18,548
+versus 25,252 KiB, and the source-line proxy rose from 173 to 343.
+The resulting local K-ratio proxy was 1.642067, just below the fixed 1.65 gate.
+These remain development-machine proxies, not official board measurements.
+
+The near miss was recorded without lowering the threshold or repeating the
+same timing trial. V11 was not submitted; its source and measurements were
+preserved, and the accepted serial source was restored. Before another change,
+the remaining per-batch scratch allocations are a candidate for measurement,
+not an established bottleneck or a promised gain.
+
+## Worker-owned scratch buffers — 2026-10-31
+
+A private diagnostic counted 197,120 nonzero-capacity request-vector lifetimes
+across 3,080 full-input batches in v11. Their cumulative final capacities were
+114,050,688 bytes. Another 9,240 scratch-buffer lifetimes accounted for
+52,930,304 bytes of cumulative capacity. These are buffer-lifetime counts,
+not allocator-call counts, peak RSS or an attribution of CPU time.
+
+Candidate v13 moved the name buffer, note scratch buffer, decoded-name arena
+and per-shard request vectors into each worker. It clears their lengths between
+batches and retains their capacities. Framing, six workers, 64 shards and
+64 KiB target batches stayed unchanged. Five private Rust tests and all 15
+correctness groups passed, including long-to-short name reuse, empty batches,
+concurrent duplicates, vector/scalar framing, CSV edge cases and tiny seeds
+37/38 followed by the frozen seed-39 holdout. Published sample/full outputs
+matched exactly.
+
+The first timing batch failed its stability check: the accepted baseline's
+middle-three spread was 0.087447 s, above the 0.05 s bound. Its apparent
+K-ratio of 1.680064 was therefore insufficient for adoption. The run was
+recorded as a measurement failure; it did not establish that the candidate's
+mechanism failed.
+
+A subsequent environment check found WSL services starting alongside a new
+remote command. The original preflight had not excluded that startup activity.
+Its contribution to the earlier timing spread remains unproven. One registered
+operational repair kept a single foreground WSL session alive, waited for
+uptime of at least 60 seconds and five consecutive quiet samples, and reused
+the exact Docker images and source. Each phase then ran two fixed, unscored
+warm-up pairs before the original five interleaved measurement pairs. No
+service, power setting, source parameter or acceptance threshold changed.
+
+The repaired batch measured middle-three image times of 0.710919 s for the
+accepted serial version and 0.183349 s for v13, a ratio of 3.877416. Both
+spread checks passed. Maximum native process RSS was 18,548 versus 24,000 KiB;
+the source-line proxy was 173 versus 357. The resulting K-ratio proxy,
+1.677626, passed the fixed 1.65 gate. All new full-input outputs matched.
+
+These are local Victus WSL measurements using the published child timer,
+native process RSS and nonblank, noncomment source lines. They are not the
+official scoring machine, cgroup-memory measurement or scc count. The original
+unstable batch remains recorded separately; the repair was one fixed batch,
+not a selection among repeated attempts. Official evaluation is still needed
+to establish this candidate's board score.
