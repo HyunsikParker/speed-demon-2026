@@ -243,3 +243,185 @@ Commit `2f5cdaf` changed D; this track's source was unchanged. Run
 machine points. The board retained the earlier best 57.437518.
 At 23:07:03 UTC on 2026-10-30, the overall display was 52.170, rank 34.
 This rerun does not establish a new algorithm improvement, final judging or an award.
+
+## Same-source observation with the popped-vertex meeting push
+
+Commit `b94f7ff` changed D; this track's source was unchanged. Run
+`run-b4d8e3a63f12` passed all five gates and recorded 57.333396
+machine points. The board retained the earlier best 57.437518.
+At 23:53:09 UTC on 2026-10-30, the overall display was 52.240, rank 35.
+This rerun does not establish a new algorithm improvement, final judging or an award.
+
+
+## Exact quantile selection — local rejection, 2026-10-31
+
+This candidate selected the exact p50, p95 and p99 ranks from successive
+partitions of each large group's latency vector. Groups of at most 32 values
+kept the existing full sort. Parsing, shards, grouping and merging were unchanged.
+The source passed 53 host, heap-oracle, range and published-hash checks, plus
+private quantile tests over boundary sizes, duplicates, reversed and extreme
+values. Seeds 13 and 14 passed before reserved seed 15; the offline container
+matched the full expected output.
+
+The first timing report was invalid. CPython's timed child wait polled at up to
+50 ms intervals, adding a quantized delay to the parent elapsed clock. The
+apparent 1.2894 speed ratio was therefore not accepted. The original data was
+retained, and only the timing procedure was repaired: the same frozen binaries
+were timed with blocking child waits under the outer run timeout.
+
+Five corrected interleaved full pairs had median elapsed command times of
+0.165261 s for the accepted code and 0.156303 s for the candidate, a
+1.05731 speed ratio. Maximum process RSS was 39,964 and 39,916
+KiB. These measurements include the GNU time wrapper; they are not official T
+or cgroup memory.peak. The combined time/memory/source-size proxy was
+1.01135, below the fixed 1.06 requirement; the speed ratio
+also missed 1.15. No official push followed. The accepted source was restored,
+and the candidate was not retuned. Codex implemented and checked this change.
+
+
+## Borrowed block lines — local rejection, 2026-10-31
+
+The candidate passed complete lines directly from a 1 MiB read buffer to the
+aggregator. Only lines split across buffers were copied. Shard ownership and
+all grouping, percentile and output rules were unchanged. Safe UTF-8 validation
+and the standard-library newline splitter added no dependency.
+
+All 53 existing checks passed, as did two private tests covering every byte
+cut, reversed merges, 1–256-byte buffers, maximum-length endpoints and EOF.
+Seeds 16 and 17 passed before reserved seed 18. The offline, unprivileged,
+read-only container matched the full published output hash.
+
+Five interleaved full pairs used blocking child waits under an outer timeout.
+Median command times were 0.182799 s for the accepted code and 0.183951 s for
+the candidate; maximum process RSS was 39,936 and 39,968 KiB. The speed ratio
+was 0.993739 and the time/memory/source-size proxy was 0.974988, below the
+fixed 1.15 and 1.06 gates. The measurements do not isolate validation, scanning
+or copying costs. No official push followed; the accepted source was restored.
+Codex implemented and checked this change.
+
+
+## Calendar-hour lookup — local rejection, 2026-10-31
+
+The input contract fixes 72 hours across October 30–November 2. This candidate
+used a 72-byte table to map each observed day/hour to its compact hour ID,
+removing the per-line hour-key hash. It retained the full observed timestamp
+keys, sparse groups, original reader, sorting and output. It did not include
+the rejected block reader.
+
+All 53 existing checks passed, along with an exhaustive 72-hour ID/key test
+in three encounter orders. Seeds 19 and 20 passed before reserved seed 21;
+the offline container matched the full published output.
+
+Five interleaved full pairs gave median command times of 0.169770 and
+0.159967 s, a 1.061281 speed ratio. Maximum process RSS was 39,956 and
+39,928 KiB. The combined time/memory/source-size proxy was 1.013147. Both
+the 1.15 speed gate and 1.06 proxy gate were missed. The accepted source was
+restored without an official push or date-arithmetic tuning. Codex implemented
+and checked this change.
+
+
+## Direct decimal rows — local rejection, 2026-10-31
+
+The candidate built each output row in one reusable byte vector. A 20-byte
+stack scratch encoded each of the six unsigned decimal fields, and the row
+was written once to the existing buffered writer. The original reader, hour
+hash map, sparse groups and full-sort quantiles were unchanged.
+
+All 53 existing checks passed. A separate decimal test compared the helper
+with the standard formatter for 0–100,000, powers of ten and their neighbours,
+u32/u64 limits and 10,000 deterministic u64 values. Seeds 22 and 23 passed
+before reserved seed 24. The offline container matched the full output hash.
+
+Five interleaved full pairs gave median command times of 0.167852 and
+0.151050 s. The 1.111234 speed ratio corresponds to about 10.0% less elapsed
+time. Maximum process RSS was 39,960 and 39,956 KiB; the simple source-line
+proxy grew from 177 to 196. The combined proxy was 1.038171, below the fixed
+1.06 gate, and speed also missed 1.15. No official push followed. The accepted
+source was restored; no digit-batching or buffer tuning was attempted. Codex
+implemented and checked this change.
+
+
+## Parallel endpoint blocks — local rejection, 2026-10-31
+
+This candidate sorted endpoints by their actual bytes and gave contiguous
+blocks to scoped workers. Each worker sorted its groups and formatted rows
+into separate hour buffers. The main thread joined those buffers in hour and
+endpoint order. Latency arrays were released after their rows were formatted.
+
+All 53 existing checks and the additional sparse-hour, endpoint-prefix and
+one-shot consumption test passed. Seeds 25 and 26 passed before reserved
+seed 27; the offline container matched the full output hash.
+
+Five interleaved full pairs gave median command times of 0.161605 and
+0.130207 s: a 1.241137 speed ratio, or 19.4% less elapsed time. Maximum
+process RSS rose from 39,964 to 47,184 KiB, a 1.180663 ratio. The combined
+time/memory/source-size proxy was 1.068820. Speed and proxy passed their
+fixed gates, but peak memory exceeded 1.05. The source was restored and
+no official push followed. Codex implemented and checked this candidate.
+
+
+## Rendezvous hour buffers — local rejection, 2026-10-31
+
+This follow-up replaced retained whole-output buffers with a zero-capacity
+channel for each endpoint block. A worker sorted and formatted one hour,
+transferred its buffer to the writer, then continued. The writer received
+buffers in hour and endpoint-block order. Completed latency arrays were freed.
+
+All 53 existing checks and two additional property tests passed, including
+endpoint-prefix order, sparse hours and cancellation after a sink error.
+Seeds 28 and 29 passed before reserved seed 30. The offline container matched
+the full published hash.
+
+Five interleaved full pairs gave median command times of 0.164894 and
+0.145468 s, a 1.133544 speed ratio, or 11.8% less elapsed time. Maximum
+process RSS was 39,940 and 39,920 KiB, within the 1.05 ratio limit. The
+combined time/memory/source-size proxy was 1.049430. Speed and proxy missed
+the fixed 1.15 and 1.06 gates. The accepted source was restored with no
+official push. Codex implemented and checked this candidate.
+
+
+## Accepted-source CPU attribution, 2026-10-31
+
+A private, byte-identical copy of the accepted source was built with optimized
+debug information. Two process-scoped software profiles each ran the full input
+five times at 499 Hz. All outputs matched. Exact ELF address resolution gave
+1,341 and 1,360 samples. The endpoint lookup source site accounted for 13.05%
+and 13.75%; endpoint delimiter scanning accounted for 10.81% and 9.12%.
+Unresolved addresses and other libraries accounted for 19.31% and 19.63%.
+These are exclusive CPU sample locations, including wrapper and profiling
+effects, not elapsed-time shares or a benchmark improvement.
+
+## Fused endpoint interning — local rejection, 2026-10-31
+
+The candidate detected the endpoint boundary and folded its bytes into a
+fingerprint in one word-wise pass. Fingerprint buckets compared complete
+endpoint bytes before reusing an ID. The original reader, hour map, groups,
+full-sort quantiles and serial output were retained.
+
+All 53 checks passed, along with tests for endpoint lengths 1–125, word
+boundaries, suffix independence and deliberately forced hash collisions.
+Seeds 31 and 32 passed before reserved seed 33; the offline container matched
+the full output hash. Median command time fell from 0.161142 to 0.148478 s
+over five interleaved pairs. The speed ratio was 1.085296, RSS ratio 1.000100
+and combined proxy 1.022838. The standalone candidate missed the fixed
+1.15 speed and 1.06 proxy gates and was not submitted.
+
+## Cross-stage pipeline — local validation, 2026-10-31
+
+One separately registered candidate combined the fixed fused endpoint handling
+with the fixed rendezvous-hour output design. Neither standalone rejection
+was reversed. The integrated binary was checked against the original accepted
+baseline with the same speed, memory and source-size gates. No hash constants,
+channel capacities or worker counts were tuned for the comparison.
+
+All 53 existing checks and four additional property tests passed, including
+forced collisions, endpoint boundaries, output ordering and sink-error
+cancellation. Seeds 34 and 35 passed before reserved seed 36. The offline,
+unprivileged container matched the full published output hash.
+
+Five interleaved full pairs gave median command times of 0.167603 and
+0.125564 s, a 1.334806 speed ratio, or 25.1% less elapsed time. Maximum
+process RSS was 39,972 and 39,912 KiB. The source-size-aware proxy was
+1.120126. All three fixed gates passed. The proxy uses nonblank source lines
+and is not the official scorer's SCC count. These are local results; no
+official points are inferred. Codex implemented and validated the changes.
