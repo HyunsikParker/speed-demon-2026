@@ -111,15 +111,33 @@ struct Batch {
 
 type NameMap = HashMap<Vec<u8>, Vec<u64>>;
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct InlineName {
+    words: [u64; 2],
+    len: u8,
+}
+
+#[derive(Clone)]
+enum NameRef {
+    Inline(InlineName),
+    Arena(std::ops::Range<usize>),
+}
+
+#[derive(Default)]
+struct NameShard {
+    inline: HashMap<InlineName, [u64; 4]>,
+    other: NameMap,
+}
+
 struct SharedNames {
-    parts: Vec<Mutex<NameMap>>,
+    parts: Vec<Mutex<NameShard>>,
     words: usize,
 }
 
 impl SharedNames {
     fn new(countries: usize) -> Self {
         Self {
-            parts: (0..64).map(|_| Mutex::new(HashMap::new())).collect(),
+            parts: (0..64).map(|_| Mutex::new(NameShard::default())).collect(),
             words: countries.div_ceil(64),
         }
     }
@@ -130,31 +148,54 @@ impl SharedNames {
         hash.finish() as usize % self.parts.len()
     }
 
-    fn apply(
-        &self,
-        bytes: &[u8],
-        requests: &[Vec<(std::ops::Range<usize>, usize)>],
-        groups: &mut [Group],
-    ) {
+    fn reference(&self, name: &[u8], arena: &mut Vec<u8>) -> NameRef {
+        if self.words <= 4 && name.len() <= 16 {
+            let mut bytes = [0u8; 16];
+            bytes[..name.len()].copy_from_slice(name);
+            NameRef::Inline(InlineName {
+                words: [
+                    u64::from_le_bytes(bytes[..8].try_into().unwrap()),
+                    u64::from_le_bytes(bytes[8..].try_into().unwrap()),
+                ],
+                len: name.len() as u8,
+            })
+        } else {
+            let begin = arena.len();
+            arena.extend_from_slice(name);
+            NameRef::Arena(begin..arena.len())
+        }
+    }
+
+    fn apply(&self, bytes: &[u8], requests: &[Vec<(NameRef, usize)>], groups: &mut [Group]) {
         assert_eq!(requests.len(), self.parts.len());
         for (part, requests) in self.parts.iter().zip(requests) {
             if requests.is_empty() {
                 continue;
             }
             let mut names = part.lock().unwrap();
-            for (range, country) in requests {
+            for (reference, country) in requests {
                 let country = *country;
-                let name = &bytes[range.clone()];
                 let bit = 1u64 << (country % 64);
-                let fresh = if let Some(bits) = names.get_mut(name) {
-                    let fresh = bits[country / 64] & bit == 0;
-                    bits[country / 64] |= bit;
-                    fresh
-                } else {
-                    let mut bits = vec![0; self.words];
-                    bits[country / 64] = bit;
-                    names.insert(name.to_vec(), bits);
-                    true
+                let fresh = match reference {
+                    NameRef::Inline(key) => {
+                        let bits = names.inline.entry(*key).or_default();
+                        let fresh = bits[country / 64] & bit == 0;
+                        bits[country / 64] |= bit;
+                        fresh
+                    }
+                    NameRef::Arena(range) => {
+                        let name = &bytes[range.clone()];
+                        if let Some(bits) = names.other.get_mut(name) {
+                            let fresh = bits[country / 64] & bit == 0;
+                            bits[country / 64] |= bit;
+                            fresh
+                        } else {
+                            let mut bits = vec![0; self.words];
+                            bits[country / 64] = bit;
+                            names.other.insert(name.to_vec(), bits);
+                            true
+                        }
+                    }
                 };
                 groups[country].distinct += u64::from(fresh);
             }
@@ -168,7 +209,7 @@ struct Partial {
     name: Vec<u8>,
     scratch: Vec<u8>,
     decoded: Vec<u8>,
-    requests: Vec<Vec<(std::ops::Range<usize>, usize)>>,
+    requests: Vec<Vec<(NameRef, usize)>>,
 }
 
 impl Partial {
@@ -213,9 +254,8 @@ impl Partial {
             let cents = (integer(&amount[..dot]) * 100 + integer(&amount[dot + 1..])) as i64;
             let cents = if negative { -cents } else { cents };
             let country = usize::from(regions.get(rid).copied().unwrap_or(0));
-            let begin = decoded.len();
-            decoded.extend_from_slice(name);
-            requests[names.part(name)].push((begin..decoded.len(), country));
+            let reference = names.reference(name, decoded);
+            requests[names.part(name)].push((reference, country));
             let g = &mut groups[country];
             if g.count == 0 {
                 g.min = cents;

@@ -406,3 +406,85 @@ official scoring machine, cgroup-memory measurement or scc count. The original
 unstable batch remains recorded separately; the repair was one fixed batch,
 not a selection among repeated attempts. Official evaluation is still needed
 to establish this candidate's board score.
+
+## Official live-board result for worker-owned scratch
+
+Commit `b917cfa54cbf3e4cfaf3aebef9abd921bdc5c624` was pushed once on
+2026-10-31 at 05:16:53 UTC. C run `run-78ca238aac1c` finished at 05:17:39 UTC
+with all five gates passed: T 0.251930 s, M 24,592,384 bytes, S 365, D 1,
+K 10.833043 and 51.737524 machine points. This improved C's prior best
+39.649090 by 12.088434 points and placed C among the team's best three tracks.
+
+At 05:18:33 UTC, the board displayed an overall score of 55.926 and rank 39.
+A, B and D reran with unchanged sources and retained their earlier bests.
+These are live-board observations, not final judging, an award or payment.
+
+## Current pipeline phases and worker-side framing
+
+Private timers on the accepted v13 source measured two full-input runs after
+the startup-readiness check. Producer time was 175.2–182.3 ms: send calls took
+83.9–89.3 ms, buffered reads 23.9–24.7 ms, record scanning 38.2–40.5 ms, and
+remaining copying/bookkeeping 26.9–30.1 ms. Median worker time was
+135.0–137.3 ms, including 67.8–68.0 ms of parsing and 66.0–68.0 ms of shared
+membership updates. All six diagnostic outputs matched their published hashes.
+Worker intervals overlap; call durations include scheduling and waiting, and
+these instrumented timings do not isolate causal savings.
+
+Candidate v15 made the producer find only the first complete record ending at
+or after each batch target. Workers then found the internal record boundaries,
+reusing their boundary vectors. The quote-parity kernel supported both modes.
+Six workers, 64 shards, the 64 KiB target and 1 MiB read buffer stayed fixed.
+Seven private Rust tests and all 15 correctness groups passed, including
+minimum-boundary offsets, chunk carry, quoted newlines, oversized records and
+tiny seeds 40/41 followed by reserved 42.
+
+One fixed five-pair image batch measured middle-three means of 0.186995 s for
+accepted v13 and 0.174319 s for v15. Both spread checks passed. The speed ratio
+was 1.072719, the native peak-RSS ratio was 0.977900, and the source-line proxy
+grew from 357 to 381. The incremental K-ratio proxy was 1.030257.
+
+The candidate missed the preregistered speed ratio of 1.18 and K-ratio of 1.08
+against the new accepted baseline. It was not submitted; v13 was restored.
+The local reduction was measurable in this batch but insufficient for those
+gates. The original serial-baseline gates and earlier negative results remain
+unchanged. Further work needs a distinct mechanism supported by measurements
+of the remaining parsing or membership cost.
+
+## Current-source CPU samples and inline membership
+
+Two private CPU profiles of accepted v13 collected 853 and 809 software
+samples; the sample smoke, unprofiled full control and both profiled outputs
+matched their expected hashes. Exact-binary inline locations attributed 171
+and 181 samples to shared membership, 104 and 110 to text decoding, and 75
+and 62 to integer parsing. These counts are not elapsed-time shares.
+
+Offline analysis of the saved profiles matched libc's build ID to the local
+library. Its resolved `memcmp`/`bcmp` entry branches to a short-byte comparison
+block containing 146 and 134 samples. This identifies that block, not its
+runtime callers. The analysis did not rerun or recapture the workload; other
+unresolved samples remain unassigned.
+
+Candidate v17 stores complete names of up to 16 bytes and four country-bitset
+words directly in the sharded table when there are at most 256 countries.
+The key includes the original byte length. Long names and larger country sets
+keep the full-byte map and variable-size bitsets. Short requests no longer
+copy names into the decoded arena. Workers, shards, batching and framing
+remain unchanged.
+
+Seven private Rust tests and all 15 correctness groups passed. They cover
+all inline-key byte positions and lengths, zero bytes, the 16/17-byte name
+boundary, country-word boundaries through 513 countries, concurrent first-pair
+updates, scratch reuse and the wider CSV grammar. Tiny seeds 43/44 ran before
+reserved seed 45; published sample and full outputs also matched.
+
+After the startup-readiness check and fixed unscored warm-ups, one five-pair
+image batch measured middle-three means of 0.186579 s for accepted v13 and
+0.152485 s for v17, a speed ratio of 1.223591. Both spread checks passed.
+Maximum native process RSS was 24,060 versus 19,828 KiB, a ratio of 0.824106.
+The source-line proxy grew from 357 to 393. The resulting incremental K-ratio
+proxy was 1.133347, passing the fixed speed, memory and efficiency gates.
+
+These are local Victus WSL measurements using the published child timer,
+native process RSS and nonblank, noncomment source lines. They do not establish
+an official score or replace official cgroup-memory and scc measurements.
+Official evaluation is still required for this candidate.

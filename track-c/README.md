@@ -24,6 +24,13 @@ and locks each nonempty shard once. The first `(name, country)` pair sets a bit
 and increments that worker's distinct count while holding the lock. Summing the
 worker counts therefore preserves global distinctness across batches.
 
+For tables with at most 256 countries, names of up to 16 bytes use inline
+entries: two words hold the complete name, a separate length distinguishes
+zero-padded values, and four words hold the country bits. These requests carry
+their keys directly, without copying them into the decoded-name arena. Longer
+names and tables with more countries retain the full-byte map and variable-size
+bitsets. Both paths preserve exact name identity.
+
 Workers retain their name buffers, decoded-name arenas and request-vector
 capacities between batches, clearing their lengths before reuse. Numeric
 aggregates remain worker-local until the final merge. All lookup structures are
@@ -52,8 +59,8 @@ the measurements and their limits.
 
 ## With another 24 hours
 
-Measure producer framing, worker parsing and shared membership separately on
-the current version. The scratch-lifetime change reduced repeated buffer
-construction, but retained high-water capacities can cost memory. A follow-up
-should identify the remaining bottleneck before changing the batch, worker or
-shard counts. The measurements and rejected variants are preserved in PERF.md.
+Measure the producer/worker balance after inline membership, including inputs
+that use the long-name or large-country-table fallback. Retained buffers and
+inline table slots have different memory costs. Further changes should follow
+measurements of the current source; the existing phase measurements and
+rejected variants are preserved in PERF.md.
