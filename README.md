@@ -21,15 +21,15 @@ The track READMEs describe boundary handling, exactness and remaining limits.
 
 ## Recorded live-board results
 
-The last own-entry readback at 2026-10-31 08:02 UTC retained these best machine
-scores. Each linked report gives its run ID, measured axes, accepted design and
-validation limits.
+The own-entry readback at 2026-11-02 03:56 UTC, after the last code push before
+freeze, retained these best machine scores. Each linked report gives its run
+ID, measured axes, accepted design and validation limits.
 
 | Track | Best machine points | Performance report |
 |---|---:|---|
 | A | 61.431366 | [Ingest](track-a/PERF.md) |
 | B | 55.479075 | [Index](track-b/PERF.md) |
-| C | 55.455380 | [Join](track-c/PERF.md) |
+| C | 57.147738 | [Join](track-c/PERF.md) |
 | D | 50.424918 | [Traverse](track-d/PERF.md) |
 
 A and D's best runs accompanied changes to other tracks, with their own source

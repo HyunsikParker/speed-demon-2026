@@ -1,26 +1,30 @@
 # Track C: performance and validation
 
-Snapshot: 2026-10-31. The current source combines inline membership with
-read-only mapping and parallel quote-parity boundary discovery. It passed the
-local adoption gate below; its first official board run is pending. The recorded
-official result still belongs to the prior inline-membership pipeline.
+Snapshot: 2026-11-02, before code freeze. The current source combines inline
+membership with read-only mapping and parallel quote-parity boundary discovery.
+It passed the local adoption gate below, and its first official board run is
+recorded in the next section.
 
 ## Recorded official result
 
-Run `run-52f0819fc621`, on commit `1c06a7cd760f25d771fb196b6e111e9b74d2666c`,
-finished at 05:55:45 UTC with all five gates passing and **55.455380 machine points**.
+Run `run-e08fc96bfae2`, on commit `29a57dc3752e417842e5bc2bf4796170c2ead170`,
+finished at 03:53:41 UTC on 2026-11-02 with all five gates passing and
+**57.147738 machine points**.
 
 | Official axis | Value |
 |---|---:|
-| T: process time | 0.187834 s |
-| M: cgroup memory peak | 20,283,392 bytes |
-| S: source size | 401 |
+| T: process time | 0.160190 s |
+| M: cgroup memory peak | 17,788,928 bytes |
+| S: source size | 483 |
 | D: dependency axis | 1 |
-| K: coefficient | 12.856051 |
+| K: coefficient | 13.898078 |
 
-This improved the prior best of 51.737524 by 3.717856 points and exceeded the
-registered 53.4-point target. The best remained unchanged in the 08:02 UTC
-readback. [MEASUREMENTS.json](../MEASUREMENTS.json) records the own-track observations;
+The prior best was `run-52f0819fc621` on commit `1c06a7c`: 55.455380 points,
+T 0.187834 s, M 20,283,392 bytes, S 401 and K 12.856051. The new run added
+1.692358 points and passed the registered 57.0-point success gate. Its K ratio
+over the prior best, 1.081053, was close to the local K-ratio proxy of 1.087865
+below; the two use different time, memory and source-size measurements.
+[MEASUREMENTS.json](../MEASUREMENTS.json) records the own-track observations;
 no final judge score or award is asserted.
 
 ## Accepted design
@@ -208,13 +212,18 @@ proxy, not official `scc`. D is one plus direct runtime dependencies, so both
 arms have D = 1; image size is only a build-limit check. These results qualify
 one official trial and do not establish a board score or prize.
 
+Commit `29a57dc` was pushed once at 2026-11-02 03:47 UTC. Its C run,
+`run-e08fc96bfae2`, is the recorded official result above. A, B and D reran
+with unchanged sources in the same push and kept their earlier bests.
+
 ## Record and assistance
 
 The [complete experiment log below](#complete-experiment-log) retains the earlier log byte-for-byte, including
 rejected trials and the operational timing repair. Historical “current” and
 “pending” statements refer to their original snapshots.
 
-Codex developed the implementation and validation.
+Codex developed the implementation and validation. Claude Code added the
+2026-11-02 board result.
 
 ## Complete experiment log
 

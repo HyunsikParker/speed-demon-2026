@@ -1,8 +1,8 @@
 {
   "kind": "historical_official_live_board_observation_not_final_judging",
-  "best_values_reconfirmed_at": "2026-10-31T08:02:18.806Z",
+  "best_values_reconfirmed_at": "2026-11-02T03:56:17Z",
   "source": "https://speeddemon.dev/board/",
-  "source_commit_snapshot": "72deb7d7d2abc47fa32758336a67fcacaa8c3b49",
+  "source_commit_snapshot": "29a57dc3752e417842e5bc2bf4796170c2ead170",
   "tracks": {
     "a": {
       "run_id": "run-8ed375c52049",
@@ -45,15 +45,15 @@
       "accepted_source_sha256": "b678b95afb3e1d3de11a081c6b54cd1e06b20edb57181e9c526d1fa0d6b9fcc9"
     },
     "c": {
-      "run_id": "run-52f0819fc621",
-      "commit": "1c06a7cd760f25d771fb196b6e111e9b74d2666c",
-      "ended_at": "2026-10-31T05:55:45Z",
-      "T_s": 0.187834,
-      "M_bytes": 20283392,
-      "S": 401,
+      "run_id": "run-e08fc96bfae2",
+      "commit": "29a57dc3752e417842e5bc2bf4796170c2ead170",
+      "ended_at": "2026-11-02T03:53:41Z",
+      "T_s": 0.16019,
+      "M_bytes": 17788928,
+      "S": 483,
       "D": 1,
-      "K": 12.856051,
-      "machine_points": 55.45538,
+      "K": 13.898078,
+      "machine_points": 57.147738,
       "same_source_control": false,
       "gates": {
         "check": true,
@@ -62,7 +62,12 @@
         "timeout": true,
         "sandbox": true
       },
-      "accepted_source_sha256": "edab533545e0be10fca888b2919a8d7e15b63556fc0df1b07776b10cc8fb9904"
+      "accepted_source_sha256": "c3b32387b4dc2e879145b481e047331695849d1c3f7d8b4c603d2ee1e94e09a9",
+      "previous_best": {
+        "run_id": "run-52f0819fc621",
+        "commit": "1c06a7cd760f25d771fb196b6e111e9b74d2666c",
+        "machine_points": 55.45538
+      }
     },
     "d": {
       "run_id": "run-396084b71fdb",
